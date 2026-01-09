@@ -13,8 +13,6 @@ __init__.py
 
 
 # Artifacts de modelo (saídas de treino)
-artifacts/**
-src/artifacts/**
 !artifacts/.gitkeep
 !src/artifacts/.gitkeep
 
