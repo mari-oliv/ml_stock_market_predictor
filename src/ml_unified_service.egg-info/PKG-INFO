@@ -1,0 +1,13 @@
+Metadata-Version: 2.4
+Name: ml-unified-service
+Version: 0.1.0
+Requires-Python: >=3.11
+Requires-Dist: SQLAlchemy<3,>=2
+Requires-Dist: pg8000>=1.30
+Requires-Dist: yfinance
+Requires-Dist: pandas
+Requires-Dist: numpy
+Requires-Dist: tensorflow
+Requires-Dist: scikit-learn
+Requires-Dist: joblib
+Requires-Dist: xgboost

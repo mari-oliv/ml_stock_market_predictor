@@ -1,0 +1,3 @@
+[console_scripts]
+ml-api = scripts.run_api:main
+ml-train = scripts.run_training:main

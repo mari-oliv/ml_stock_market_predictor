@@ -1,0 +1,211 @@
+Metadata-Version: 2.4
+Name: ml-stock-market-predictor
+Version: 0.1.0
+Summary: Serviço unificado de treinamento de modelos e API para previsão de mercado.
+Author: Marina Oliveira
+License: MIT
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: fastapi>=0.115
+Requires-Dist: uvicorn[standard]>=0.30
+Requires-Dist: pydantic>=2.6
+Requires-Dist: numpy>=1.26
+Requires-Dist: pandas>=2.2
+Requires-Dist: scikit-learn>=1.5
+Requires-Dist: joblib>=1.3
+Requires-Dist: sqlalchemy>=2.0
+Requires-Dist: python-dotenv>=1.0
+Requires-Dist: httpx>=0.26
+Provides-Extra: dev
+Requires-Dist: pytest>=8; extra == "dev"
+Requires-Dist: pytest-cov>=4; extra == "dev"
+Requires-Dist: ruff>=0.4; extra == "dev"
+Requires-Dist: black>=24.10; extra == "dev"
+Requires-Dist: mypy>=1.8; extra == "dev"
+Dynamic: license-file
+
+# ml-stock-market-predictor
+
+Serviço FastAPI para predição de preços de fechamento da bolsa de valores de uma empresa escolhida.
+
+## Estrutura do projeto
+
+```
+ml-stock-market-predictor/
+   artifacts/
+   data/
+   notebooks/
+   src/
+      api/
+      core/
+      inference/
+      shared/
+      training/
+      utils/
+   tests/
+   pyproject.toml
+   Dockerfile
+```
+
+## Rotas da API
+
+As rotas estão definidas em [src/api/routes.py](src/api/routes.py) e carregadas em [src/api/main.py](src/api/main.py).
+
+Base URL (local): http://127.0.0.1:8000
+
+### GET /
+
+Health-check.
+
+Resposta (exemplo):
+
+```json
+{"status":"api is working"}
+```
+
+### POST /predict
+
+Gera a próxima predição de preço. Por padrão (`data_source="auto"`), tenta **yfinance** e, se falhar, faz fallback para **CSV**.
+
+Body (JSON):
+
+- `symbol` (obrigatório): ticker (ex.: `PETR4.SA`, `AAPL`)
+- `data_source` (opcional): `auto` | `yfinance` | `csv` (default: `auto`)
+- `csv_path` (opcional): caminho do CSV quando usar `csv` (ou como fallback do `auto`)
+- `csv_target_col` (opcional): coluna alvo do CSV (se omitida, tenta inferir)
+- `artifact_path` (opcional): caminho do artefato do modelo
+
+Exemplo (mínimo):
+
+```bash
+curl --location "http://127.0.0.1:8000/predict" \
+   --header "Content-Type: application/json" \
+   --data '{"symbol":"PETR4.SA"}'
+```
+
+Exemplo (auto + fallback CSV explícito):
+
+```bash
+curl --location "http://127.0.0.1:8000/predict" \
+   --header "Content-Type: application/json" \
+   --data '{"symbol":"PETR4.SA","data_source":"auto","csv_path":"data/finance_data.csv","csv_target_col":"Close"}'
+```
+
+Resposta (exemplo):
+
+```json
+{"value":29.93,"symbol":"PETR4.SA","date":"2026-01-09T03:27:57.060199+00:00"}
+```
+
+### POST /train
+
+Dispara o treino em background executando o notebook padrão: `notebooks/notebook.ipynb` (no container ele fica em `/app/notebooks/notebook.ipynb`).
+
+Variáveis úteis para o treino:
+
+- `TRAIN_KERNEL_NAME` (default: `python3`)
+- `TRAIN_KERNEL_STARTUP_TIMEOUT_S` (default: `900` = 15min) — aumenta o tempo para o kernel iniciar quando o notebook demora.
+
+Exemplo:
+
+```bash
+curl -X POST "http://127.0.0.1:8000/train"
+```
+
+Resposta (exemplo):
+
+```json
+{
+   "status": "started",
+   "started_at": "2026-01-09T03:42:50.759785+00:00",
+   "notebook": "/app/notebooks/notebook.ipynb",
+   "message": "Treino iniciado, aguarde uns minutos antes de verificar o status."
+}
+```
+
+### GET /check_train
+
+Retorna status do treino + métricas de desempenho.
+
+Campos principais:
+
+- `train_status`: `idle` | `running` | `succeeded` | `failed`
+- `elapsed_s`: tempo decorrido (segundos) enquanto está `running`
+- `duration_s`: tempo total (segundos) quando finaliza
+- `metrics`: tempos por etapa (`find_notebook_s`, `prepare_paths_s`, `execute_s`), `engine`, `notebook_in`, `notebook_out`
+
+Exemplo:
+
+```bash
+curl "http://127.0.0.1:8000/check_train"
+```
+
+## Executar com Docker (macOS / Linux / Windows)
+
+O container sobe a API via Uvicorn (porta `8000`). O Dockerfile está em [Dockerfile](Dockerfile).
+
+### macOS (Apple Silicon: M1/M2/M3)
+
+Use `--platform linux/amd64` para evitar warnings e manter compatibilidade com a imagem base do TensorFlow.
+
+```bash
+cd "ml-stock-market-predictor"
+
+docker build --platform linux/amd64 -t ml-stock-market-predictor:latest .
+
+docker rm -f ml-stock-market-predictor 2>/dev/null || true
+docker run --platform linux/amd64 -d --name ml-stock-market-predictor \
+   -p 8000:8000 \
+   -v "$PWD/data:/app/data" \
+   -e DATABASE_URL="sqlite:///data/predictions.db" \
+   ml-stock-market-predictor:latest
+
+docker logs -f --tail=50 ml-stock-market-predictor
+```
+
+### macOS (Intel) e Linux (x86_64)
+
+```bash
+cd "ml-stock-market-predictor"
+
+docker build -t ml-stock-market-predictor:latest .
+
+docker rm -f ml-stock-market-predictor 2>/dev/null || true
+docker run -d --name ml-stock-market-predictor \
+   -p 8000:8000 \
+   -v "$PWD/data:/app/data" \
+   -e DATABASE_URL="sqlite:///data/predictions.db" \
+   ml-stock-market-predictor:latest
+
+docker logs -f --tail=50 ml-stock-market-predictor
+```
+
+### Windows (PowerShell)
+
+```powershell
+cd "ml-stock-market-predictor"
+
+docker build -t ml-stock-market-predictor:latest .
+
+docker rm -f ml-stock-market-predictor 2>$null
+docker run -d --name ml-stock-market-predictor `
+   -p 8000:8000 `
+   -v "${PWD}\data:/app/data" `
+   -e DATABASE_URL="sqlite:///data/predictions.db" `
+   ml-stock-market-predictor:latest
+
+docker logs -f --tail 50 ml-stock-market-predictor
+```
+
+### Parar/remover o container
+
+```bash
+docker rm -f ml-stock-market-predictor
+```
+
+## Testes
+
+```bash
+pytest
+```

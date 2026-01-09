@@ -1,0 +1,31 @@
+# Virtualenv
+ml-stock-market-predictor/.venv/
+
+# Diretório de agentes fora do projeto
+.github/agents/
+agents/
+agente/
+
+# Artifacts: ignorar conteúdo, manter diretório
+ml-stock-market-predictor/artifacts/**
+!ml-stock-market-predictor/artifacts/.gitkeep
+
+# Python cache
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Artefatos/modelos
+best_lstm_artifact.pkl
+*.pkl
+
+# Logs
+*.log
+
+# Backup files
+requirements.txt.bak

@@ -1,0 +1,9 @@
+SQLAlchemy<3,>=2
+pg8000>=1.30
+yfinance
+pandas
+numpy
+tensorflow
+scikit-learn
+joblib
+xgboost

@@ -1,0 +1,13 @@
+services:
+  api:
+    image: ml-stock-market-predictor:latest
+    build:
+      context: .
+    platform: ${DOCKER_PLATFORM:-linux/amd64}
+    ports:
+      - "8000:8000"
+    volumes:
+      - "./data:/app/data"
+    environment:
+      DATABASE_URL: "sqlite:///data/predictions.db"
+      TRAIN_KERNEL_STARTUP_TIMEOUT_S: "900"
