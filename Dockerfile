@@ -13,8 +13,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 COPY pyproject.toml README.md ./
 COPY src ./LSTM/src
-COPY notebooks ./LSTM/notebooks
-COPY data ./LSTM/data
+# COPY data ./LSTM/data   # remova esta linha
+
+# garante que o diretório existe (opcional, o volume já cria em runtime)
+RUN mkdir -p /app/data
 
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir . && \
