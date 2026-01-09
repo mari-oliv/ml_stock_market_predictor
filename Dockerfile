@@ -26,5 +26,5 @@ RUN python -m ipykernel install --name python3 --display-name "Python 3" --sys-p
 
 RUN mkdir -p /app/data
 
-EXPOSE 8000
-CMD ["python", "-m", "uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+EXPOSE 10000
+CMD ["python", "-m", "uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "10000"]
