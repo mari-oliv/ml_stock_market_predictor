@@ -5,8 +5,9 @@ from socket import timeout
 import sqlite3
 from datetime import datetime
 import requests
+import warnings
 
-
+warnings.filterwarnings("ignore")
 
 PREDICTION_PATH = "https://ml-stock-market-predictor.onrender.com/predict"
 PREDICTION_HEADERS = {"Content-Type": "application/json"}

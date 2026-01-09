@@ -4,12 +4,43 @@ import sqlite3
 import sys
 import time
 from agent import AgenteConselheiroDeAcoes
+import yfinance as yf
 import warnings
+from datetime import datetime, timedelta
 warnings.filterwarnings("ignore")
 
+
+PREDICTION_PATH = "https://ml-stock-market-predictor.onrender.com/predict"
+PREDICTION_HEADERS = {"Content-Type": "application/json"}
+PREDICTION_BODY={"symbol":"PETR4.SA"}
+PREDICTION_ARGUMENTS = {"timeout":60,
+                "max_retries":10}
+
 CSV_FILE = "./LSTM/data/finance_data.csv"
+
 DB_FILE = "agent/memory.db"
 
+def _env_int(name: str, default: int) -> int:
+    """
+    Lê uma variável de ambiente e converte para inteiro com valor padrão.
+    """
+    v = os.getenv(name)
+    if v is None or str(v).strip() == "":
+        return default
+    try:
+        return int(float(str(v).strip()))
+    except Exception:
+        return default
+    
+TRAIN_MAX_ROWS = _env_int("TRAIN_MAX_ROWS", 0)
+
+SYMBOL = os.getenv("TRAIN_SYMBOL", "PETR4.SA").strip()
+
+START_DATE = os.getenv(
+    "TRAIN_START_DATE",
+    (datetime.today() - timedelta(days=300)).strftime("%Y-%m-%d"),
+).strip()
+END_DATE = os.getenv("TRAIN_END_DATE", datetime.today().strftime("%Y-%m-%d")).strip()
 
 def print_warning(path: str) -> None:
     """
@@ -47,8 +78,14 @@ def csv_read(caminho_arquivo: str) -> tuple[list[float], str]:
 
     precos = []
     nome_da_acao = "Desconhecida"
-
+        
     try:
+        df = yf.download(SYMBOL, start=START_DATE, end=END_DATE, progress=False)
+        df = df.reset_index()
+        if TRAIN_MAX_ROWS and TRAIN_MAX_ROWS > 0:
+            df = df.tail(TRAIN_MAX_ROWS).reset_index(drop=True)
+        return df
+    except Exception as e:
         with open(caminho_arquivo, newline="", encoding="utf-8") as f:
             reader = csv.reader(f)
 
@@ -68,9 +105,6 @@ def csv_read(caminho_arquivo: str) -> tuple[list[float], str]:
                         precos.append(valor)
                     except ValueError:
                         continue  # Pula linhas com erro de formatação
-    except Exception as e:
-        print(f"Erro ao ler CSV: {e}")
-        sys.exit(1)
 
     return precos, nome_da_acao
 
