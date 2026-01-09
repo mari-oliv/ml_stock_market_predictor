@@ -7,7 +7,7 @@ services:
     ports:
       - "10000:10000"
     volumes:
-      - "./data:/app/data"
+      - ".LSTM/data:/app/data"
     environment:
       DATABASE_URL: "sqlite:///data/predictions.db"
       TRAIN_KERNEL_STARTUP_TIMEOUT_S: "20000"
