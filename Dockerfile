@@ -12,9 +12,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     MODEL_ARTIFACT_PATH=/app/src/artifacts/best_lstm_artifact.pkl
 
 COPY pyproject.toml README.md ./
-COPY src ./src
-COPY notebooks ./notebooks
-COPY data ./data
+COPY src ./LSTM/src
+COPY notebooks ./LSTM/notebooks
+COPY data ./LSTM/data
 
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir . && \
