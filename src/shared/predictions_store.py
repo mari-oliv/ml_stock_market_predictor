@@ -1,8 +1,11 @@
-"""Persistência de predições em banco de dados via SQLAlchemy.
+"""Persistência de predições e métricas em banco de dados via SQLAlchemy.
 
-Este módulo resolve a URL do banco a partir de `DATABASE_URL` (quando definido)
-e, caso contrário, utiliza um SQLite local em `data/predictions.db`. Também
-garante que o schema mínimo exista antes de inserir registros.
+Contexto:
+    Este módulo resolve a URL do banco a partir da variável de ambiente
+    ``DATABASE_URL`` (quando definida) e, caso contrário, utiliza um SQLite
+    local em ``data/predictions.db``. Ele também garante que o schema mínimo
+    exista antes de inserir registros tanto na tabela de predições quanto na
+    de métricas de treino.
 """
 
 import os
@@ -13,12 +16,29 @@ from src.utils.datetime_utils import brasilia_iso
 
 
 def _project_root() -> str:
-    """Retorna o caminho absoluto da raiz do projeto a partir deste módulo."""
+    """Retorna o caminho absoluto da raiz do projeto.
+
+    Contexto:
+        A raiz do projeto é inferida a partir da localização deste módulo,
+        caminhando dois níveis acima em relação ao diretório atual.
+
+    Returns:
+        str: Caminho absoluto da raiz do projeto.
+    """
     return os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
 
 
 def _default_sqlite_url() -> str:
-    """Monta a URL do SQLite local e garante a existência do diretório `data/`."""
+    """Monta a URL do SQLite local e garante a existência do diretório ``data/``.
+
+    Contexto:
+        Usado como fallback quando ``DATABASE_URL`` não está configurada. O
+        arquivo SQLite é criado em ``data/predictions.db`` dentro da raiz do
+        projeto, criando o diretório ``data/`` caso ainda não exista.
+
+    Returns:
+        str: URL de conexão no formato ``sqlite:///.../data/predictions.db``.
+    """
     root = _project_root()
     data_dir = os.path.join(root, "data")
     os.makedirs(data_dir, exist_ok=True)
@@ -30,7 +50,16 @@ engine = create_engine(DB_URL, pool_pre_ping=True, future=True)
 
 
 def _ensure_schema() -> None:
-    """Cria a tabela `predictions` se não existir, com fallback para SQLite."""
+    """Cria a tabela ``predictions`` se não existir.
+
+    Contexto:
+        Executa um DDL padrão (com tipos "grandes") e, em caso de falha
+        (por exemplo, em SQLite), aplica um DDL alternativo compatível com
+        SQLite. Deve ser chamado antes de qualquer inserção em ``predictions``.
+
+    Returns:
+        None
+    """
     ddl = """
     CREATE TABLE IF NOT EXISTS predictions (
         id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
@@ -57,9 +86,15 @@ def _ensure_schema() -> None:
 
 
 def _ensure_metrics_schema() -> None:
-    """Cria a tabela `metrics` se não existir.
+    """Cria a tabela ``metrics`` se não existir.
 
-    A tabela armazena snapshots de métricas do treino (uma linha por execução finalizada).
+    Contexto:
+        A tabela armazena snapshots de métricas do treino (uma linha por
+        execução finalizada), incluindo tempos de cada etapa, engine utilizada
+        e informações do kernel do notebook.
+
+    Returns:
+        None
     """
     sqlite_ddl = """
     CREATE TABLE IF NOT EXISTS metrics (
@@ -90,12 +125,20 @@ _ensure_metrics_schema()
 
 
 def save_prediction(symbol: str, value: float, date_iso: str) -> None:
-    """Salva uma predição na tabela `predictions`.
+    """Salva uma predição na tabela ``predictions``.
+
+    Contexto:
+        Insere uma nova linha na tabela de predições, registrando o símbolo,
+        o valor previsto, a data de referência e o timestamp de criação em
+        horário de Brasília.
 
     Args:
         symbol: Ticker/símbolo associado à predição.
         value: Valor previsto.
         date_iso: Data/hora (ISO-8601) referente ao valor previsto.
+
+    Returns:
+        None
     """
     created_iso = brasilia_iso()
     with engine.begin() as conn:
@@ -120,18 +163,28 @@ def save_train_metrics_snapshot(
     metrics: dict,
     error: str | None,
 ) -> None:
-    """Salva um snapshot das métricas do treino na tabela `metrics`.
+    """Salva um snapshot das métricas do treino na tabela ``metrics``.
+
+    Contexto:
+        Esta função é pensada para ser chamada ao final de uma execução de
+        treino (bem-sucedida ou não), consolidando em uma única linha as
+        principais métricas e metadados da execução.
 
     Args:
-        train_status: Status final do treino (ex.: "succeeded" ou "failed").
-        started_at: ISO-8601 do início.
-        ended_at: ISO-8601 do fim.
-        duration_s: Duração total (s).
-        elapsed_s: Tempo decorrido reportado (s).
-        notebook: Caminho do notebook executado.
-        last_output_ipynb: Caminho do notebook de saída (se existir).
-        metrics: Dict de métricas (engine, tempos por etapa, kernel, etc.).
-        error: Mensagem de erro (se houver).
+        train_status: Status final do treino (por exemplo, ``"succeeded"`` ou
+            ``"failed"``).
+        started_at: Momento de início do treino em formato ISO-8601, ou ``None``.
+        ended_at: Momento de término do treino em formato ISO-8601, ou ``None``.
+        duration_s: Duração total (em segundos) ou ``None``.
+        elapsed_s: Tempo decorrido reportado (em segundos) ou ``None``.
+        notebook: Caminho do notebook executado, ou ``None``.
+        last_output_ipynb: Caminho do notebook de saída (se existir), ou ``None``.
+        metrics: Dicionário com métricas e metadados adicionais (engine, tempos
+            por etapa, kernel, etc.).
+        error: Mensagem de erro associada à execução, ou ``None``.
+
+    Returns:
+        None
     """
     created_at = brasilia_iso()
     with engine.begin() as conn:

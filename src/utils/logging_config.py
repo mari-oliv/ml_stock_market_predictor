@@ -1,7 +1,10 @@
 """Configuração central de logging da aplicação.
 
-Define formato e nível de logs via variável de ambiente `LOG_LEVEL` e garante
-que logs de `uvicorn`/`fastapi` sigam o mesmo nível.
+Contexto:
+    Define formato e nível de logs a partir da variável de ambiente
+    ``LOG_LEVEL`` e garante que os loggers relacionados a ``uvicorn`` e
+    ``fastapi`` utilizem o mesmo nível configurado para o restante da
+    aplicação.
 """
 
 import logging
@@ -12,11 +15,14 @@ import sys
 def setup_logging() -> logging.Logger:
     """Configura o logging global e retorna o logger principal da aplicação.
 
-    Lê `LOG_LEVEL` do ambiente, configura `logging.basicConfig` com handler para
-    stdout e ajusta o nível de loggers relacionados ao Uvicorn/FastAPI.
+    Contexto:
+        Lê ``LOG_LEVEL`` do ambiente, aplica ``logging.basicConfig`` com
+        handler para ``stdout`` e ajusta o nível de loggers relacionados ao
+        Uvicorn/FastAPI para manter um comportamento consistente de logs.
 
     Returns:
-        Logger principal com nome "app".
+        logging.Logger: Logger principal com nome ``"app"`` já configurado
+        com nível e *handlers* apropriados.
     """
     level_name = os.getenv("LOG_LEVEL", "INFO").upper()
     level = getattr(logging, level_name, logging.INFO)

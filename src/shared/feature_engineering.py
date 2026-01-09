@@ -5,17 +5,20 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 
 def preprocess_data(df: pd.DataFrame):
-    """Preprocessa um DataFrame aplicando transformações numéricas e categóricas.
+    """Preprocessa um DataFrame com transformações numéricas e categóricas.
 
-    Seleciona automaticamente:
-    - colunas numéricas (`int64`, `float64`) para `StandardScaler`
-    - colunas categóricas (`object`) para `OneHotEncoder`
+    Contexto:
+        Detecta automaticamente colunas numéricas e categóricas para
+        aplicar ``StandardScaler`` e ``OneHotEncoder``, respectivamente,
+        retornando a matriz transformada pronta para modelagem.
 
     Args:
-        df: DataFrame de entrada.
+        df: DataFrame de entrada contendo variáveis numéricas e/ou
+            categóricas.
 
     Returns:
-        Matriz transformada resultante do `ColumnTransformer` (tipicamente numpy array ou sparse).
+        Matriz resultante do :class:`sklearn.compose.ColumnTransformer`,
+        tipicamente ``numpy.ndarray`` ou matriz *sparse*.
     """
     numerical_features = df.select_dtypes(include=["int64", "float64"]).columns.tolist()
     categorical_features = df.select_dtypes(include=["object"]).columns.tolist()
@@ -36,14 +39,21 @@ def preprocess_data(df: pd.DataFrame):
 def feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
     """Aplica etapas de engenharia de features em um DataFrame.
 
+    Contexto:
+        Exemplo simples de criação de atributo derivado a partir da
+        coluna ``existing_feature``. Pode ser estendido com regras de
+        negócio adicionais.
+
     Args:
-        df: DataFrame de entrada.
+        df: DataFrame de entrada contendo, no mínimo, a coluna
+            ``existing_feature``.
 
     Returns:
-        DataFrame com features adicionais.
+        Novo DataFrame com a coluna adicional ``new_feature``.
 
     Raises:
-        KeyError: Se as colunas esperadas não existirem no DataFrame.
+        KeyError: Se a coluna ``existing_feature`` não existir no
+            DataFrame de entrada.
     """
     df = df.copy()
     df["new_feature"] = df["existing_feature"] * 2
@@ -53,8 +63,14 @@ def feature_engineering(df: pd.DataFrame) -> pd.DataFrame:
 def create_pipeline() -> Pipeline:
     """Cria um pipeline de pré-processamento e engenharia de features.
 
+    Contexto:
+        Encapsula as etapas de transformação em um único objeto
+        compatível com a API de pipelines do scikit-learn, combinando
+        pré-processamento e engenharia de features.
+
     Returns:
-        Pipeline do scikit-learn contendo as etapas de preprocessamento e feature engineering.
+        Instância de :class:`sklearn.pipeline.Pipeline` contendo as
+        etapas ``preprocess_data`` e ``feature_engineering``.
     """
     return Pipeline(
         steps=[

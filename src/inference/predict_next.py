@@ -1,8 +1,11 @@
 """Rotinas de inferência para predição do próximo preço.
 
-Este módulo resolve o caminho do artefato treinado (pickle via joblib),
-reconstrói o modelo Keras a partir de configurações/pesos armazenados e
-executa a predição a partir de uma janela recente de valores.
+Contexto:
+    Este módulo resolve o caminho do artefato treinado (pickle via
+    ``joblib``), reconstrói o modelo Keras a partir de configurações e
+    pesos armazenados e executa a predição com base em uma janela
+    recente de valores, podendo carregar séries históricas tanto de
+    CSV quanto de ``yfinance``.
 """
 
 from __future__ import annotations
@@ -25,10 +28,20 @@ tf = None
 
 
 def _ensure_tf() -> None:
-    """Garante que o TensorFlow esteja importado apenas quando necessário.
+    """Garante o carregamento tardio do TensorFlow para uso em inferência.
 
-    Isso permite importar o projeto (e rodar testes) em ambientes sem TensorFlow,
-    desde que as rotinas de inferência não sejam executadas.
+    Contexto:
+        Evita que a importação do projeto falhe em ambientes sem
+        TensorFlow instalado, desde que as rotinas de inferência não
+        sejam executadas. O módulo é carregado apenas quando
+        necessário, via import dinâmico.
+
+    Returns:
+        None.
+
+    Raises:
+        RuntimeError: Se TensorFlow não estiver disponível no ambiente
+            no momento em que a inferência é requerida.
     """
     global tf
     if tf is not None:
@@ -47,31 +60,53 @@ logger = logging.getLogger("app.inference")
 
 
 def _project_root() -> str:
-    """Retorna o caminho absoluto da raiz do projeto a partir deste módulo."""
+    """Obtém o caminho absoluto da raiz do projeto.
+
+    Contexto:
+        Parte da localização deste módulo de inferência para subir na
+        árvore de diretórios até a raiz do repositório, permitindo
+        resolver caminhos relativos de dados e artefatos.
+
+    Returns:
+        Caminho absoluto da raiz do projeto como string.
+    """
+
     return os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
 
 
 def _default_fallback_csv_path() -> str:
-    """Retorna o caminho padrão do CSV de fallback dentro da pasta `data/`."""
+    """Retorna o caminho padrão do CSV de fallback na pasta ``data``.
+
+    Contexto:
+        Usado quando nenhuma origem CSV é explicitamente informada,
+        assumindo o arquivo padrão ``data/finance_data.csv`` sob a
+        raiz do projeto.
+
+    Returns:
+        Caminho absoluto para o CSV de fallback.
+    """
+
     return os.path.join(_project_root(), "data", "finance_data.csv")
 
 
 def _infer_csv_target_col(df: pd.DataFrame, symbol: Optional[str] = None) -> str:
-    """Infere a coluna alvo no CSV com base no símbolo e heurísticas comuns.
+    """Infere a coluna alvo de um CSV com base em símbolo e heurísticas.
 
-    Prioriza a coluna que coincide com `symbol`, depois tenta colunas típicas de
-    preço de fechamento (Close/Adj Close) e, por fim, retorna a primeira coluna
-    numérica disponível.
+    Contexto:
+        Tenta primeiro uma coluna cujo nome seja igual ao ``symbol``,
+        depois nomes típicos de preço de fechamento (``Close``,
+        ``Adj Close``, etc.) e, em último caso, seleciona a primeira
+        coluna numérica disponível.
 
     Args:
-        df: DataFrame carregado do CSV.
+        df: DataFrame carregado a partir do CSV bruto.
         symbol: Símbolo (ticker) para priorizar coluna com mesmo nome.
 
     Returns:
-        Nome da coluna alvo.
+        Nome da coluna alvo escolhida.
 
     Raises:
-        ValueError: Se não for possível inferir uma coluna alvo.
+        ValueError: Se não for possível inferir uma coluna alvo válida.
     """
     if symbol and symbol in df.columns:
         return symbol
@@ -113,7 +148,20 @@ def _resolve_artifact_path(artifact_path: Optional[str], symbol: Optional[str] =
     FIXED_NAME = "best_lstm_artifact.pkl"
 
     def is_file(p: Optional[str]) -> Optional[str]:
-        """Normaliza e valida se `p` aponta para um arquivo existente."""
+        """Normaliza caminho e verifica se referencia um arquivo existente.
+
+        Contexto:
+            Facilita a validação de caminhos vindos de parâmetro ou
+            variáveis de ambiente, retornando ``None`` quando o arquivo
+            não existe.
+
+        Args:
+            p: Caminho potencial para o artefato.
+
+        Returns:
+            Caminho absoluto validado ou ``None`` se o arquivo não
+            estiver presente.
+        """
         if not p:
             return None
         p = os.path.abspath(os.path.expanduser(p))
@@ -169,18 +217,25 @@ def _resolve_artifact_path(artifact_path: Optional[str], symbol: Optional[str] =
 
 
 def _sanitize_keras_config(obj: Any) -> Any:
-    """Sanitiza configs para melhorar compatibilidade entre versões TF/Keras.
+    """Normaliza estruturas de configuração para compatibilidade TF/Keras.
+
+    Contexto:
+        Aplica correções em campos conhecidos de configs de modelo e
+        camadas para reduzir quebras entre versões diferentes de
+        TensorFlow/Keras.
 
     Ajustes aplicados:
-    - Converte DTypePolicy -> string (ex: "float32")
-    - Remove chaves build_config/build_input_shape (podem quebrar em algumas versões)
-    - Normaliza InputLayer: batch_shape -> batch_input_shape (remove batch_shape)
+        * Converte ``DTypePolicy`` em string (por exemplo, ``"float32"``).
+        * Remove as chaves ``build_config`` e ``build_input_shape``.
+        * Em ``InputLayer``, mapeia ``batch_shape`` para
+          ``batch_input_shape`` e remove ``batch_shape``.
 
     Args:
-        obj: Estrutura (dict/list/valor) representando config de modelo/layers.
+        obj: Estrutura arbitrária (``dict``, ``list`` ou valor
+            escalar) representando a configuração do modelo ou layers.
 
     Returns:
-        Estrutura sanitizada, mantendo o formato do input.
+        Estrutura sanitizada, preservando o formato geral de entrada.
     """
     if isinstance(obj, dict):
         if obj.get("class_name") == "InputLayer" and isinstance(obj.get("config"), dict):
@@ -208,13 +263,19 @@ def _sanitize_keras_config(obj: Any) -> Any:
 
 
 def _infer_input_shape_from_cfg(cfg: Any) -> Optional[tuple]:
-    """Tenta inferir o `input_shape` a partir do config do modelo.
+    """Tenta inferir o ``input_shape`` a partir da configuração do modelo.
+
+    Contexto:
+        Extrai shapes de entrada a partir de campos como
+        ``build_input_shape``, ``batch_input_shape`` ou ``batch_shape``,
+        usados posteriormente para invocar ``build`` manualmente.
 
     Args:
-        cfg: Config do modelo (dict esperado, mas aceita Any).
+        cfg: Configuração do modelo, preferencialmente um ``dict``.
 
     Returns:
-        Uma tupla representando `build_input_shape`/`batch_input_shape` ou `None`.
+        Tupla representando o shape de entrada inferido, ou ``None``
+        quando não for possível deduzir.
     """
     if not isinstance(cfg, dict):
         return None
@@ -237,19 +298,20 @@ def _infer_input_shape_from_cfg(cfg: Any) -> Optional[tuple]:
 def _deserialize_model_from_artifact_cfg(raw_cfg: Any) -> tf.keras.Model:
     """Desserializa um modelo Keras a partir de múltiplos formatos de config.
 
-    Formatos suportados:
-    - JSON de `model.to_json()` (dict com class_name/config ou string JSON)
-    - dict vindo de `Sequential.get_config()` (com 'layers' no topo)
-    - lista legacy de configs de layers
+    Contexto:
+        Permite reconstituir o modelo armazenado no artefato mesmo
+        quando a configuração foi salva em formatos diferentes
+        (JSON de ``model.to_json()``, ``Sequential.get_config()``,
+        lista de camadas, etc.).
 
     Args:
-        raw_cfg: Config bruta armazenada no artefato.
+        raw_cfg: Configuração bruta armazenada no artefato.
 
     Returns:
-        Instância de `tf.keras.Model`.
+        Instância de :class:`tf.keras.Model` reconstruída.
 
     Raises:
-        ValueError: Se o formato de config não for suportado.
+        ValueError: Se o formato de configuração não for suportado.
     """
     _ensure_tf()
     cfg = raw_cfg
@@ -297,18 +359,27 @@ def _deserialize_model_from_artifact_cfg(raw_cfg: Any) -> tf.keras.Model:
 
 
 def load_artifact_pkl(path: str) -> Dict[str, Any]:
-    """Carrega e valida um artefato `.pkl` e reconstrói o modelo Keras.
+    """Carrega e valida um artefato ``.pkl`` e reconstrói o modelo Keras.
+
+    Contexto:
+        Lê o arquivo serializado via ``joblib``, reconstrói o modelo,
+        aplica pesos, recompila conforme configuração armazenada e
+        expõe componentes principais em um dicionário.
 
     Args:
-        path: Caminho do arquivo `.pkl`.
+        path: Caminho para o arquivo de artefato ``.pkl``.
 
     Returns:
-        Dict com `model`, `scaler`, `window_size`, `feature_names`, `metadata` e `best_params`.
+        Dicionário contendo, no mínimo, as chaves ``model``, ``scaler``,
+        ``window_size``, ``feature_names``, ``metadata`` e
+        ``best_params``.
 
     Raises:
         FileNotFoundError: Se o arquivo não existir.
-        ValueError: Se o conteúdo do artefato estiver inválido/incompleto.
-        RuntimeError: Se falhar a desserialização do modelo ou a aplicação de pesos.
+        ValueError: Se o conteúdo do artefato estiver inválido ou
+            incompleto.
+        RuntimeError: Se falhar a desserialização do modelo ou a
+            aplicação de pesos.
     """
     _ensure_tf()
     if not os.path.isfile(path):
@@ -369,17 +440,24 @@ def predict_next_from_recent(
     artifact: Dict[str, Any],
     recent_values: Union[pd.Series, np.ndarray],
 ) -> float:
-    """Prediz o próximo valor a partir de uma janela de valores recentes.
+    """Prediz o próximo valor real a partir de uma janela recente.
+
+    Contexto:
+        Usa o scaler e o modelo contidos no artefato para normalizar a
+        última janela de valores, realizar a inferência e retornar o
+        próximo valor na escala original.
 
     Args:
-        artifact: Artefato carregado por `load_artifact_pkl`.
-        recent_values: Série/array com valores recentes (precisa ter ao menos `window_size`).
+        artifact: Artefato carregado por :func:`load_artifact_pkl`.
+        recent_values: Série ou array 1D com os valores históricos
+            mais recentes; deve conter pelo menos ``window_size``
+            observações.
 
     Returns:
-        Próximo valor previsto (escala original).
+        Próximo valor previsto em escala real (``float``).
 
     Raises:
-        ValueError: Se `recent_values` não tiver tamanho suficiente.
+        ValueError: Se ``recent_values`` não tiver amostras suficientes.
     """
     _ensure_tf()
     scaler = artifact["scaler"]
@@ -410,17 +488,23 @@ def _load_series_from_csv(
 ) -> pd.Series:
     """Carrega uma série temporal a partir de CSV, inferindo colunas quando necessário.
 
+    Contexto:
+        Constrói uma série indexada por datas, usando as colunas de
+        data e alvo informadas ou inferidas por heurísticas, para
+        posterior uso em inferência ou treinamento.
+
     Args:
-        csv_path: Caminho do CSV.
-        date_col: Nome da coluna de data (se None, tenta inferir).
-        target_col: Nome da coluna alvo (se None, tenta inferir).
-        symbol: Símbolo para priorizar na inferência de coluna alvo.
+        csv_path: Caminho do arquivo CSV.
+        date_col: Nome da coluna de data; se ``None``, tenta inferir.
+        target_col: Nome da coluna alvo; se ``None``, tenta inferir.
+        symbol: Símbolo usado como pista para inferência da coluna alvo.
 
     Returns:
-        Série com índice de datas e valores float.
+        Série Pandas com índice datetime e valores ``float``.
 
     Raises:
-        ValueError: Se não for possível inferir/encontrar colunas necessárias.
+        ValueError: Se não for possível inferir ou encontrar colunas
+            obrigatórias de data/alvo.
     """
     df = pd.read_csv(csv_path)
 
@@ -450,16 +534,23 @@ def _load_series_from_csv(
 
 
 def _load_series_from_yf(symbol: str) -> pd.Series:
-    """Carrega preços históricos via yfinance e devolve a série de fechamento.
+    """Carrega preços históricos via ``yfinance`` e devolve a série de fechamento.
+
+    Contexto:
+        Faz o download de cerca de 6 meses de dados, trata multi-index,
+        garante a presença de colunas ``Close`` e ``Date`` e retorna
+        uma série univariada pronta para uso em inferência.
 
     Args:
-        symbol: Ticker no formato aceito pelo yfinance (ex.: "PETR4.SA").
+        symbol: Ticker no formato aceito pelo ``yfinance`` (por exemplo,
+            ``"PETR4.SA"``).
 
     Returns:
-        Série de preços de fechamento, indexada por data.
+        Série de preços de fechamento indexada por data.
 
     Raises:
-        ValueError: Se não encontrar colunas esperadas no retorno do yfinance.
+        ValueError: Se o retorno do ``yfinance`` não contiver as
+            colunas esperadas.
     """
     import yfinance as yf
 
@@ -503,10 +594,28 @@ def predict_next_price(
     date_col: Optional[str] = None,
     csv_target_col: Optional[str] = None,
 ) -> Tuple[float, str]:
-    """Prediz o próximo preço para um símbolo, usando yfinance ou CSV como fonte.
+    """Prediz o próximo preço para um símbolo usando artefato salvo.
 
-    `data_source="auto"` tenta yfinance e, se falhar, usa CSV (csv_path se fornecido,
-    senão `data/finance_data.csv`).
+    Contexto:
+        Resolve o artefato de modelo, carrega a série histórica a
+        partir de ``yfinance`` ou CSV e delega a inferência para
+        :func:`predict_next_from_recent`, retornando também qual fonte
+        de dados foi efetivamente utilizada.
+
+    Args:
+        symbol: Ticker do ativo a ser previsto.
+        artifact_path: Caminho opcional para o artefato ``.pkl``;
+            quando ``None``, é resolvido por heurísticas internas.
+        data_source: Origem preferencial dos dados ("yfinance",
+            "csv" ou "auto").
+        csv_path: Caminho opcional para um CSV local; usado quando
+            ``data_source == "csv"`` ou como fallback.
+        date_col: Nome da coluna de data no CSV, quando aplicável.
+        csv_target_col: Nome da coluna alvo no CSV, quando aplicável.
+
+    Returns:
+        Tupla ``(valor_previsto, fonte_utilizada)``, onde
+        ``fonte_utilizada`` é "yfinance" ou "csv".
     """
     path = _resolve_artifact_path(artifact_path, symbol=symbol)
     logger.info(f"predict:artifact path={path}")

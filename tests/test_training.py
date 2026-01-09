@@ -1,3 +1,12 @@
+"""Testes de integração para o fluxo de treino via API.
+
+Contexto:
+    Este módulo valida o comportamento combinado dos endpoints ``/train`` e
+    ``/check_train``, garantindo que o disparo de treino atualize o estado
+    global de treino e que o endpoint de verificação exponha os principais
+    campos de status e métricas esperados.
+"""
+
 from __future__ import annotations
 
 from fastapi.testclient import TestClient
@@ -6,7 +15,15 @@ from src.api.main import app
 
 
 def test_train_starts_and_check_train_returns_all_fields(monkeypatch) -> None:
-    """Valida que /train dispara treino e /check_train retorna status + novos campos."""
+    """Valida que ``/train`` dispara treino e ``/check_train`` retorna status e campos.
+
+    Contexto:
+        Usa *monkeypatch* para simular pré-requisitos, execução imediata do
+        notebook e persistência de métricas, de forma que o teste não dependa
+        de execução real de notebooks nem de componentes externos. Em seguida
+        chama ``POST /train`` e ``GET /check_train`` e verifica se o payload
+        contém os principais campos de estado e métricas.
+    """
     import src.api.routes as routes
 
     def _fake_collect_prereqs():

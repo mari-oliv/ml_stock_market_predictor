@@ -1,9 +1,15 @@
 .venv/
 
+# Configurações locais de editor
+.vscode/
+
 # Build / distribuição
 *.egg-info/
 dist/
 build/
+poetry.lock
+__init__.py
+
 
 # Artifacts de modelo (saídas de treino)
 artifacts/**

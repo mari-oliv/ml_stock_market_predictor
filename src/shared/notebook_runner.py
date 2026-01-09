@@ -11,26 +11,38 @@ def run_notebook_last_cell(
     output_path: str,
     timeout: int = 600,
 ) -> float:
-    """Executa um notebook injetando parâmetros e retorna o valor produzido no output JSON.
+    """Executa um notebook parametrizado e lê o valor numérico de saída.
 
-    O notebook é carregado, recebe uma célula inicial com as variáveis de `params`,
-    e é executado via `nbclient` usando o kernel definido em `NB_KERNEL` (ou um padrão).
-    Após a execução, este método lê `output_path` (JSON) e retorna um float.
+    Contexto:
+        Carrega um notebook existente, injeta uma célula inicial com as
+        variáveis fornecidas em ``params`` e executa tudo via
+        :class:`nbclient.NotebookClient`, usando o kernel definido na
+        variável de ambiente ``NB_KERNEL`` (ou um padrão). Ao final,
+        lê um arquivo JSON gerado pelo próprio notebook e converte o
+        conteúdo em ``float``.
 
     Args:
-        notebook_path: Caminho do notebook `.ipynb` a ser executado.
-        params: Dicionário de parâmetros a serem injetados como variáveis Python.
-        output_path: Caminho do arquivo JSON esperado como saída (criado pelo notebook).
-        timeout: Timeout (em segundos) para execução do notebook.
+        notebook_path: Caminho do notebook ``.ipynb`` a ser executado.
+        params: Dicionário de parâmetros a serem injetados como
+            variáveis Python na primeira célula.
+        output_path: Caminho do arquivo JSON esperado como saída,
+            criado/atualizado pelo notebook.
+        timeout: Tempo máximo, em segundos, permitido para execução do
+            notebook.
 
     Returns:
-        Valor numérico lido do JSON. Aceita JSON sendo número direto ou dict com chave "value".
+        Valor numérico lido do arquivo JSON de saída. Aceita tanto um
+        JSON numérico direto quanto um ``dict`` com a chave
+        ``"value"``.
 
     Raises:
-        FileNotFoundError: Se `notebook_path` não existir.
-        RuntimeError: Se o notebook não gerar o arquivo esperado em `output_path`.
-        ValueError: Se o conteúdo do JSON não puder ser convertido para float.
-        json.JSONDecodeError: Se o arquivo de saída não for JSON válido.
+        FileNotFoundError: Se ``notebook_path`` não existir.
+        RuntimeError: Se o notebook não gerar o arquivo esperado em
+            ``output_path``.
+        ValueError: Se o conteúdo JSON não puder ser convertido para
+            ``float``.
+        json.JSONDecodeError: Se o arquivo de saída não contiver JSON
+            válido.
     """
     if not os.path.exists(notebook_path):
         raise FileNotFoundError(f"Notebook não encontrado: {notebook_path}")

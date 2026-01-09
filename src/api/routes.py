@@ -26,9 +26,19 @@ router = APIRouter()
 
 
 class PredictRequest(BaseModel):
-    """Payload de entrada para o endpoint de predição.
+    """Modelo de entrada para o endpoint de predição ``POST /predict``.
 
-    `data_source="auto"` tenta yfinance primeiro e, se falhar, usa CSV.
+    Contexto:
+        Representa o payload recebido pela API para geração de uma
+        predição de preço de ativo, permitindo escolher a origem dos
+        dados (yfinance ou CSV local) e um artefato de modelo opcional.
+
+    Atributos:
+        symbol: Código do ativo a ser previsto (por exemplo, "PETR4.SA").
+        data_source: Origem dos dados a ser utilizada ("auto", "yfinance" ou "csv").
+        csv_path: Caminho opcional para um CSV local contendo a série histórica.
+        csv_target_col: Nome opcional da coluna alvo dentro do CSV informado.
+        artifact_path: Caminho opcional para o artefato de modelo já treinado.
     """
 
     symbol: str
@@ -40,13 +50,41 @@ class PredictRequest(BaseModel):
 
 @router.get("/")
 def health():
-    """Endpoint de verificação de saúde da API."""
+    """Verifica a saúde básica da API.
+
+    Contexto:
+        Usado por ferramentas de monitoramento ou orquestração para
+        confirmar que o serviço HTTP está respondendo.
+
+    Returns:
+        Dicionário simples com a chave ``status`` indicando operação normal.
+    """
+
     return {"status": "api is working"}
 
 
 @router.post("/predict")
 def predict(req: PredictRequest):
-    """Gera a próxima predição de preço e persiste o resultado quando possível."""
+    """Gera a próxima predição de preço e persiste o resultado.
+
+    Contexto:
+        Orquestra a inferência do próximo valor de preço usando o
+        artefato de modelo disponível e a fonte de dados configurada.
+        Quando possível, registra a predição em armazenamento interno
+        para fins de histórico.
+
+    Args:
+        req: Instância de :class:`PredictRequest` contendo símbolo,
+            origem dos dados e caminhos opcionais de CSV/artefato.
+
+    Returns:
+        Dicionário com valor previsto (arredondado), símbolo, data de
+        referência e metadados sobre a fonte de dados utilizada.
+
+    Raises:
+        HTTPException: Em caso de falha na etapa de predição ou
+            carregamento de dados/modelo, com código 500.
+    """
     extra = {
         "symbol": req.symbol,
         "data_source": req.data_source,
@@ -99,12 +137,21 @@ _TRAIN_LOCK = threading.Lock()
 
 
 def _parse_datetime(value: str) -> datetime:
-    """Faz parse de timestamps com e sem espaço antes do offset.
+    """Converte uma string de timestamp em instância ``datetime``.
 
-    Aceita:
-    - `YYYY-MM-DDTHH:MM:SS-03:00`
-    - `YYYY-MM-DD HH:MM:SS-03:00`
-    - `YYYY-MM-DD HH:MM:SS -03:00`
+    Contexto:
+        Normaliza diferentes variações de formatação de timezone
+        (com ou sem espaço antes do offset) para um único objeto
+        ``datetime`` utilizável em cálculos de duração.
+
+    Args:
+        value: String com o timestamp em formato ISO compatível,
+            por exemplo ``"YYYY-MM-DDTHH:MM:SS-03:00"`` ou variantes
+            com espaços.
+
+    Returns:
+        Objeto :class:`datetime.datetime` representando o instante
+        informado na string.
     """
     try:
         return datetime.fromisoformat(value)
@@ -116,14 +163,32 @@ def _parse_datetime(value: str) -> datetime:
 
 
 def _project_root() -> str:
-    """Retorna o caminho absoluto da raiz do projeto a partir deste módulo."""
+    """Obtém o caminho absoluto da raiz do projeto.
+
+    Contexto:
+        Parte da localização deste módulo para subir na hierarquia
+        de diretórios até a raiz do repositório, permitindo resolver
+        caminhos relativos de notebooks e artefatos.
+
+    Returns:
+        Caminho absoluto da raiz do projeto em forma de string.
+    """
+
     return os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
 
 
 def _collect_train_prereqs() -> dict[str, Any]:
-    """Coleta informações sobre kernel e dependências necessárias para o treino.
+    """Coleta informações sobre kernel Jupyter e dependências de treino.
 
-    Isso ajuda a validar se o kernel está disponível e se as libs do runner existem no ambiente.
+    Contexto:
+        Verifica se bibliotecas necessárias ao runner de notebooks
+        estão instaladas e se o kernel configurado está disponível,
+        permitindo validar o ambiente antes de disparar o treino.
+
+    Returns:
+        Dicionário com timestamp da checagem, nome do kernel,
+        disponibilidade do kernel, lista de módulos ausentes e
+        flag booleana ``ok`` indicando se o ambiente está pronto.
     """
     required = ["nbclient", "nbformat", "ipykernel", "jupyter_client"]
     missing: list[str] = []
@@ -153,7 +218,22 @@ def _collect_train_prereqs() -> dict[str, Any]:
 
 
 def _find_notebook(root: str) -> str:
-    """Localiza o notebook de treino, usando env vars e caminhos padrão."""
+    """Localiza o notebook de treino a partir da raiz do projeto.
+
+    Contexto:
+        Busca o caminho do ``notebook.ipynb`` usando variáveis de
+        ambiente de override e, em seguida, padrões conhecidos de
+        diretórios, com fallback para busca recursiva.
+
+    Args:
+        root: Caminho absoluto considerado como raiz do projeto.
+
+    Returns:
+        Caminho absoluto para o notebook de treino encontrado.
+
+    Raises:
+        FileNotFoundError: Se nenhum notebook de treino for localizado.
+    """
     env_nb = os.getenv("TRAIN_NOTEBOOK") or os.getenv("TRAIN_NOTEBOOK_PATH")
     candidates = []
     if env_nb:
@@ -181,7 +261,17 @@ def _find_notebook(root: str) -> str:
 
 
 def _run_notebook():
-    """Executa o notebook de treino de forma assíncrona e atualiza o estado global."""
+    """Executa o notebook de treino e atualiza o estado global.
+
+    Contexto:
+        Função interna disparada em thread dedicada para executar o
+        notebook de treinamento, medir tempos das etapas principais e
+        registrar métricas/erros em ``TRAIN_STATE``.
+
+    Returns:
+        None. Os efeitos são observados via mutação de ``TRAIN_STATE``
+        e logs, além de eventual gravação de métricas persistentes.
+    """
     with _TRAIN_LOCK:
         TRAIN_STATE["status"] = "running"
         TRAIN_STATE["phase"] = "starting"
@@ -325,7 +415,26 @@ def _run_notebook():
 
 @router.post("/train")
 def start_train(notebook: Optional[str] = None):
-    """Dispara o treino em background executando um notebook (com override opcional)."""
+    """Inicia o fluxo de treinamento de modelo em background.
+
+    Contexto:
+        Resolve o notebook de treino a ser utilizado (podendo ser
+        sobrescrito via parâmetro), valida sua existência e inicia
+        uma thread que executa o notebook assincronamente.
+
+    Args:
+        notebook: Caminho opcional para um notebook específico a ser
+            usado no treino. Quando informado, sobrescreve o padrão
+            via variável de ambiente ``TRAIN_NOTEBOOK``.
+
+    Returns:
+        Dicionário com o status de inicialização, timestamp de início
+        e caminho do notebook de treino efetivamente utilizado.
+
+    Raises:
+        HTTPException: Se o notebook indicado não existir ou não puder
+            ser resolvido a partir da raiz do projeto.
+    """
     if notebook:
         nb_path = os.path.abspath(os.path.expanduser(notebook))
         if not os.path.exists(nb_path):
@@ -361,7 +470,23 @@ def start_train(notebook: Optional[str] = None):
 
 @router.get("/check_train")
 def check_train(symbol: Optional[str] = None):
-    """Retorna o status do treino e informa se há artefato disponível para o símbolo."""
+    """Consulta o status do processo de treinamento e disponibilidade de artefato.
+
+    Contexto:
+        Permite acompanhar o andamento do treino disparado em
+        background, além de informar se já existe artefato salvo
+        para um símbolo específico quando fornecido.
+
+    Args:
+        symbol: Código opcional do ativo para checagem de existência
+            de artefato treinado associado.
+
+    Returns:
+        Dicionário contendo estado atual do treino, métricas
+        temporais, informações de pré-requisitos do ambiente,
+        status de salvamento de métricas e presença/caminho do
+        artefato para o símbolo consultado.
+    """
     prereqs_snapshot = None
     with _TRAIN_LOCK:
         if TRAIN_STATE.get("prereqs") is not None:

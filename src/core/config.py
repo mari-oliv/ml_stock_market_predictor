@@ -1,7 +1,10 @@
-"""Configuração central do projeto via variáveis de ambiente.
+"""Configuração central do projeto baseada em variáveis de ambiente.
 
-Carrega valores do arquivo `.env` (se existir) e expõe configurações em uma
-classe estática para uso no restante da aplicação.
+Contexto:
+    Responsável por carregar valores do arquivo ``.env`` (quando
+    existente) e expor parâmetros globais de configuração para o
+    restante da aplicação, como caminhos de modelo, URL de banco
+    de dados e versão da API.
 """
 
 import os
@@ -12,7 +15,19 @@ load_dotenv()
 
 
 class Config:
-    """Configurações da aplicação carregadas do ambiente."""
+    """Namespace estático com configurações carregadas do ambiente.
+
+    Contexto:
+        Lido pelos diferentes componentes da aplicação (API, treino
+        e inferência) para obter valores de configuração padronizados.
+
+    Atributos de classe:
+        DEBUG: Flag booleana indicando execução em modo debug.
+        DATABASE_URL: URL de conexão com o banco de dados.
+        MODEL_PATH: Caminho base onde modelos treinados são armazenados.
+        FEATURE_SET: Nome do conjunto de features a ser utilizado.
+        API_VERSION: Versão exposta nos endpoints da API.
+    """
 
     DEBUG = os.getenv("DEBUG", "False") == "True"
     DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///default.db")

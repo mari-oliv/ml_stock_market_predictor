@@ -16,8 +16,6 @@ ml-stock-market-predictor/
       shared/
       training/
       utils/
-      "data_source_requested": "auto",
-      "data_source_used": "yfinance"  
    Dockerfile
 ```
 
@@ -68,7 +66,13 @@ curl --location "http://127.0.0.1:8000/predict" \
 Resposta (exemplo):
 
 ```json
-{"value":29.93,"symbol":"PETR4.SA","date":"2026-01-09T03:27:57.060199+00:00"}
+{
+   "value": 29.93,
+   "symbol": "PETR4.SA",
+   "date": "2026-01-09T03:27:57.060199+00:00",
+   "data_source_requested": "auto",
+   "data_source_used": "yfinance"
+}
 ```
 
 ### POST /train
