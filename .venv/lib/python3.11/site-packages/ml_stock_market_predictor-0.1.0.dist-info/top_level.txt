@@ -1,7 +1,0 @@
-api
-artifacts
-core
-inference
-shared
-training
-utils
