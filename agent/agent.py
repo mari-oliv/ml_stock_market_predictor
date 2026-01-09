@@ -372,7 +372,8 @@ class AgenteConselheiroDeAcoes:
                 PREDICTION_PATH,
                 headers=PREDICTION_HEADERS,
                 json=PREDICTION_BODY,
-                timeout=60
+                timeout=60,
+                max_retries=10,
             )
             predicted_price = prediction_response.json().get("value")
         except Exception as e:
