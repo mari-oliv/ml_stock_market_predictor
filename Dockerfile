@@ -6,7 +6,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     DATABASE_URL="sqlite:///data/predictions.db" \
     LOG_LEVEL="INFO" \
-    PYTHONPATH="/app" \
+    PYTHONPATH="./LSTM/src" \
     KERAS_BACKEND=tensorflow \
     MODEL_ARTIFACT_DIR=/app/artifacts \
     MODEL_ARTIFACT_PATH=/app/artifacts/best_lstm_artifact.pkl
@@ -14,7 +14,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 COPY pyproject.toml README.md ./
 COPY src ./src
 # Os artefatos do modelo ficam versionados em src/artifacts
-COPY src/artifacts ./artifacts
+COPY src/artifacts ./src/artifacts
 COPY notebooks ./notebooks
 COPY data ./data
 
