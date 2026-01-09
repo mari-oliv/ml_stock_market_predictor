@@ -55,7 +55,7 @@ def predict(req: PredictRequest):
     }
     with section("predict", logger, extra):
         try:
-            value = predict_next_price(
+            value, data_source_used = predict_next_price(
                 symbol=req.symbol,
                 artifact_path=req.artifact_path,
                 data_source=req.data_source,
@@ -67,7 +67,13 @@ def predict(req: PredictRequest):
                 save_prediction(req.symbol, value, now_iso)
             except Exception as e:
                 logger.warning(f"predict:save_prediction error={e}")
-            return {"value": round(value, 2), "symbol": req.symbol, "date": now_iso}
+            return {
+                "value": round(value, 2),
+                "symbol": req.symbol,
+                "date": now_iso,
+                "data_source_requested": req.data_source,
+                "data_source_used": data_source_used,
+            }
         except Exception as e:
             logger.exception(f"predict:error symbol={req.symbol}")
             raise HTTPException(status_code=500, detail=str(e))
@@ -85,7 +91,6 @@ TRAIN_STATE = {
     "prereqs": None,
     "execute_engine": None,
     "execute_started_at": None,
-    "papermill_started_at": None,
     "nbclient_started_at": None,
     "metrics": {},
     "metrics_saved": False,
@@ -120,7 +125,7 @@ def _collect_train_prereqs() -> dict[str, Any]:
 
     Isso ajuda a validar se o kernel está disponível e se as libs do runner existem no ambiente.
     """
-    required = ["papermill", "nbclient", "nbformat", "ipykernel", "jupyter_client"]
+    required = ["nbclient", "nbformat", "ipykernel", "jupyter_client"]
     missing: list[str] = []
     for module_name in required:
         try:
@@ -188,7 +193,6 @@ def _run_notebook():
         TRAIN_STATE["metrics_saved"] = False
         TRAIN_STATE["execute_engine"] = None
         TRAIN_STATE["execute_started_at"] = None
-        TRAIN_STATE["papermill_started_at"] = None
         TRAIN_STATE["nbclient_started_at"] = None
         TRAIN_STATE["metrics"] = {
             "engine": None,
@@ -235,50 +239,27 @@ def _run_notebook():
             TRAIN_STATE["metrics"]["prepare_paths_s"] = prep_s
             TRAIN_STATE["metrics"]["notebook_out"] = nb_out
 
-        engine_used = None
         t0 = perf_counter()
-        try:
-            import papermill as pm
+        import nbformat
+        from nbclient import NotebookClient
 
-            with _TRAIN_LOCK:
-                TRAIN_STATE["phase"] = "execute"
-                TRAIN_STATE["execute_engine"] = "papermill"
-                TRAIN_STATE["execute_started_at"] = brasilia_iso()
-                TRAIN_STATE["papermill_started_at"] = TRAIN_STATE["execute_started_at"]
-            with section("train.execute", logger, {"engine": "papermill", "nb_out": nb_out}):
-                pm.execute_notebook(
-                    nb_in,
-                    nb_out,
-                    kernel_name=TRAIN_KERNEL_NAME,
-                    startup_timeout=TRAIN_KERNEL_STARTUP_TIMEOUT_S,
-                    timeout=None,
-                )
-            engine_used = "papermill"
-        except Exception as e:
-            logger.warning(f"train:papermill_failed falling_back_to_nbclient error={e}")
-
-        if engine_used is None:
-            import nbformat
-            from nbclient import NotebookClient
-
-            with _TRAIN_LOCK:
-                TRAIN_STATE["phase"] = "execute"
-                TRAIN_STATE["execute_engine"] = "nbclient"
-                if TRAIN_STATE.get("execute_started_at") is None:
-                    TRAIN_STATE["execute_started_at"] = brasilia_iso()
-                TRAIN_STATE["nbclient_started_at"] = TRAIN_STATE["execute_started_at"]
-            with section("train.execute", logger, {"engine": "nbclient", "nb_out": nb_out}):
-                nb = nbformat.read(nb_in, as_version=4)
-                client = NotebookClient(
-                    nb,
-                    timeout=None,
-                    startup_timeout=TRAIN_KERNEL_STARTUP_TIMEOUT_S,
-                    kernel_name=TRAIN_KERNEL_NAME,
-                    allow_errors=False,
-                )
-                client.execute()
-                nbformat.write(nb, nb_out)
-            engine_used = "nbclient"
+        with _TRAIN_LOCK:
+            TRAIN_STATE["phase"] = "execute"
+            TRAIN_STATE["execute_engine"] = "nbclient"
+            TRAIN_STATE["execute_started_at"] = brasilia_iso()
+            TRAIN_STATE["nbclient_started_at"] = TRAIN_STATE["execute_started_at"]
+        with section("train.execute", logger, {"engine": "nbclient", "nb_out": nb_out}):
+            nb = nbformat.read(nb_in, as_version=4)
+            client = NotebookClient(
+                nb,
+                timeout=None,
+                startup_timeout=TRAIN_KERNEL_STARTUP_TIMEOUT_S,
+                kernel_name=TRAIN_KERNEL_NAME,
+                allow_errors=False,
+            )
+            client.execute()
+            nbformat.write(nb, nb_out)
+        engine_used = "nbclient"
 
         exec_s = round((perf_counter() - t0), 3)
         with _TRAIN_LOCK:
@@ -374,7 +355,7 @@ def start_train(notebook: Optional[str] = None):
         "status": "started",
         "started_at": now,
         "notebook": resolved_nb,
-        "message": "Treino iniciado, aguarde uns minutos antes de verificar o status.",
+        "message": "Treino do modelo iniciado, aguarde em torno de 15 à 30 minutos para verificar o status",
     }
 
 
@@ -407,7 +388,6 @@ def check_train(symbol: Optional[str] = None):
         metrics_saved_state = bool(TRAIN_STATE.get("metrics_saved"))
         execute_engine_state = TRAIN_STATE.get("execute_engine")
         execute_started_at_state = TRAIN_STATE.get("execute_started_at")
-        papermill_started_at_state = TRAIN_STATE.get("papermill_started_at")
         nbclient_started_at_state = TRAIN_STATE.get("nbclient_started_at")
 
     elapsed_s = None
@@ -455,7 +435,6 @@ def check_train(symbol: Optional[str] = None):
         "prereqs": prereqs_snapshot,
         "execute_engine": execute_engine_state,
         "execute_started_at": execute_started_at_state,
-        "papermill_started_at": papermill_started_at_state,
         "nbclient_started_at": nbclient_started_at_state,
         "started_at": started_at_state,
         "ended_at": ended_at_state,

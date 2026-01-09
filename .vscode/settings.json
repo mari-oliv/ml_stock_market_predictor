@@ -1,5 +1,8 @@
 {
-  "python.defaultInterpreterPath": "ml-stock-market-predictor/.venv/bin/python",
+  "python.defaultInterpreterPath": ".venv/bin/python",
   "python.testing.pytestEnabled": true,
-  "python.testing.pytestArgs": ["ml-stock-market-predictor/tests"]
+  "python.testing.pytestArgs": [
+    "ml-stock-market-predictor/tests"
+  ],
+  "git.ignoreLimitWarning": true
 }

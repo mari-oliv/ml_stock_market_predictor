@@ -23,12 +23,11 @@ def test_train_starts_and_check_train_returns_all_fields(monkeypatch) -> None:
             routes.TRAIN_STATE["status"] = "running"
             routes.TRAIN_STATE["phase"] = "execute"
             routes.TRAIN_STATE["started_at"] = "2026-01-09 00:00:00 -03:00"
-            routes.TRAIN_STATE["execute_engine"] = "papermill"
+            routes.TRAIN_STATE["execute_engine"] = "nbclient"
             routes.TRAIN_STATE["execute_started_at"] = "2026-01-09 00:00:01 -03:00"
-            routes.TRAIN_STATE["papermill_started_at"] = "2026-01-09 00:00:01 -03:00"
-            routes.TRAIN_STATE["nbclient_started_at"] = None
+            routes.TRAIN_STATE["nbclient_started_at"] = "2026-01-09 00:00:01 -03:00"
             routes.TRAIN_STATE["metrics"] = {
-                "engine": "papermill",
+                "engine": "nbclient",
                 "find_notebook_s": 0.001,
                 "prepare_paths_s": 0.001,
                 "execute_s": 0.001,
@@ -77,7 +76,6 @@ def test_train_starts_and_check_train_returns_all_fields(monkeypatch) -> None:
     assert "prereqs" in payload
     assert "execute_engine" in payload
     assert "execute_started_at" in payload
-    assert "papermill_started_at" in payload
     assert "nbclient_started_at" in payload
 
     assert "metrics" in payload

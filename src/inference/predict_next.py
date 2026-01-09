@@ -11,7 +11,7 @@ import glob
 import json
 import logging
 import os
-from typing import Any, Dict, Optional, TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Union
 
 import joblib
 import numpy as np
@@ -502,7 +502,7 @@ def predict_next_price(
     csv_path: Optional[str] = None,
     date_col: Optional[str] = None,
     csv_target_col: Optional[str] = None,
-) -> float:
+) -> Tuple[float, str]:
     """Prediz o próximo preço para um símbolo, usando yfinance ou CSV como fonte.
 
     `data_source="auto"` tenta yfinance e, se falhar, usa CSV (csv_path se fornecido,
@@ -513,19 +513,31 @@ def predict_next_price(
     art = load_artifact_pkl(path)
 
     series: pd.Series
+    data_source_used: Optional[str] = None
 
     if data_source == "csv":
         final_csv_path = csv_path or _default_fallback_csv_path()
         series = _load_series_from_csv(final_csv_path, date_col, csv_target_col, symbol=symbol)
+        data_source_used = "csv"
     else:
         try:
             series = _load_series_from_yf(symbol)
+            data_source_used = "yfinance"
         except Exception as e:
             fallback_csv = csv_path or _default_fallback_csv_path()
             logger.warning(
                 f"predict:data_source yfinance failed ({e}); falling back to csv={fallback_csv}"
             )
             series = _load_series_from_csv(fallback_csv, date_col, csv_target_col, symbol=symbol)
+            data_source_used = "csv"
 
     recent = series.iloc[-art["window_size"] :]
-    return predict_next_from_recent(art, recent)
+    value = predict_next_from_recent(art, recent)
+    logger.info(
+        "predict:completed symbol=%s data_source_requested=%s data_source_used=%s value=%.4f",
+        symbol,
+        data_source,
+        data_source_used,
+        value,
+    )
+    return value, (data_source_used or data_source)

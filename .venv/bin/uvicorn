@@ -1,4 +1,4 @@
-#!/Users/marina.oliveira/Documents/ESTUDOS/tc-financas/ml-stock-market-predictor/.venv/bin/python3.11
+#!/Users/marina.oliveira/Documents/ESTUDOS/tc-financas/ml-stock-market-predictor/.venv/bin/python
 import sys
 from uvicorn.main import main
 if __name__ == '__main__':

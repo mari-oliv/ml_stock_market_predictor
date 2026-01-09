@@ -14,13 +14,26 @@ dependencies = [
   "fastapi>=0.115",
   "uvicorn[standard]>=0.30",
   "pydantic>=2.6",
-  "numpy>=1.26",
+  # TensorFlow 2.15.x requer NumPy < 2.0
+  "numpy>=1.26,<2.0",
   "pandas>=2.2",
   "scikit-learn>=1.5",
   "joblib>=1.3",
   "sqlalchemy>=2.0",
   "python-dotenv>=1.0",
-  "httpx>=0.26"
+  "httpx>=0.26",
+
+  # Fonte de dados (Yahoo Finance) usada no /predict e no notebook
+  "yfinance>=0.2",
+
+  # Execução de notebook para /train
+  "nbclient>=0.10",
+  "nbformat>=5.10",
+  "ipykernel>=6.29",
+  "jupyter_client>=8.0",
+
+  # Modelo (LSTM/Keras) para treino e inferência
+  "tensorflow==2.15.1"
 ]
 
 [project.optional-dependencies]

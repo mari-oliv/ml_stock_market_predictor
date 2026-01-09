@@ -10,4 +10,4 @@ services:
       - "./data:/app/data"
     environment:
       DATABASE_URL: "sqlite:///data/predictions.db"
-      TRAIN_KERNEL_STARTUP_TIMEOUT_S: "900"
+      TRAIN_KERNEL_STARTUP_TIMEOUT_S: "20000"

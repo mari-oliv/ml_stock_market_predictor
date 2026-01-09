@@ -6,7 +6,6 @@ garante que o schema mínimo exista antes de inserir registros.
 """
 
 import os
-from datetime import datetime
 
 from sqlalchemy import create_engine, text
 

@@ -1,18 +1,37 @@
-# Virtualenv
-ml-stock-market-predictor/.venv/
+.venv/
 
-# Diretório de agentes fora do projeto
-.github/agents/
-agents/
-agente/
+# Build / distribuição
+*.egg-info/
+dist/
+build/
 
-# Artifacts: ignorar conteúdo, manter diretório
-ml-stock-market-predictor/artifacts/**
-!ml-stock-market-predictor/artifacts/.gitkeep
+# Artifacts de modelo (saídas de treino)
+artifacts/**
+src/artifacts/**
+!artifacts/.gitkeep
+!src/artifacts/.gitkeep
+
+# Ambiente virtual e caches na raiz do projeto atual
+.pytest_cache/
+.ruff_cache/
+
+# Cobertura de testes
+.coverage
+htmlcov/
+
+# Bancos locais (ex.: predictions.db)
+*.db
+*.sqlite
+*.sqlite3
+
+# Arquivos de ambiente/segredos
+.env
+.env.*
+*.env
 
 # Python cache
 __pycache__/
-*.pyc
+*.py[cod]
 
 # macOS
 .DS_Store
@@ -20,12 +39,7 @@ __pycache__/
 # Jupyter
 .ipynb_checkpoints/
 
-# Artefatos/modelos
-best_lstm_artifact.pkl
-*.pkl
-
 # Logs
 *.log
 
-# Backup files
-requirements.txt.bak
+notebook_fast.ipynb

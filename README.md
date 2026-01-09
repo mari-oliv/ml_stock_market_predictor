@@ -6,18 +6,18 @@ Serviço FastAPI para predição de preços de fechamento da bolsa de valores de
 
 ```
 ml-stock-market-predictor/
-   artifacts/
    data/
    notebooks/
    src/
       api/
+      artifacts/
       core/
       inference/
       shared/
       training/
       utils/
-   tests/
-   pyproject.toml
+      "data_source_requested": "auto",
+      "data_source_used": "yfinance"  
    Dockerfile
 ```
 
@@ -75,6 +75,11 @@ Resposta (exemplo):
 
 Dispara o treino em background executando o notebook padrão: `notebooks/notebook.ipynb` (no container ele fica em `/app/notebooks/notebook.ipynb`).
 
+Também é possível sobrescrever o notebook via:
+
+- query param `notebook` em `/train` (caminho absoluto ou relativo no container)
+- variável de ambiente `TRAIN_NOTEBOOK` / `TRAIN_NOTEBOOK_PATH`
+
 Variáveis úteis para o treino:
 
 - `TRAIN_KERNEL_NAME` (default: `python3`)
@@ -91,6 +96,7 @@ Exemplo:
 
 ```bash
 curl -X POST "http://127.0.0.1:8000/train"
+```
 
 Exemplo (Docker run mais rápido):
 
@@ -113,7 +119,7 @@ Resposta (exemplo):
    "status": "started",
    "started_at": "2026-01-09T03:42:50.759785+00:00",
    "notebook": "/app/notebooks/notebook.ipynb",
-   "message": "Treino iniciado, aguarde uns minutos antes de verificar o status."
+   "message": "Treino do modelo iniciado, aguarde em torno de 15 à 30 minutos para verificar o status"
 }
 ```
 
@@ -124,14 +130,30 @@ Retorna status do treino + métricas de desempenho.
 Campos principais:
 
 - `train_status`: `idle` | `running` | `succeeded` | `failed`
+- `phase`: fase atual do fluxo de treino (`idle`, `starting`, `find_notebook`, `prepare_paths`, `execute`, `finalizing`, `done`)
+- `prereqs`: informações sobre kernel e dependências (chaves como `kernel_name`, `kernel_available`, `missing_modules`, `ok`)
+- `execute_engine`: engine usada para execução do notebook (ex.: `nbclient`)
+- `execute_started_at` / `nbclient_started_at`: timestamps de início da execução
 - `elapsed_s`: tempo decorrido (segundos) enquanto está `running`
 - `duration_s`: tempo total (segundos) quando finaliza
 - `metrics`: tempos por etapa (`find_notebook_s`, `prepare_paths_s`, `execute_s`), `engine`, `notebook_in`, `notebook_out`
+- `artifact_found`: se um artefato (modelo treinado) foi encontrado para o símbolo
+- `artifact_path`: caminho absoluto do artefato encontrado
+
+Query params úteis:
+
+- `symbol` (opcional): ticker para o qual deseja verificar se há artefato disponível (ex.: `PETR4.SA`)
 
 Exemplo:
 
 ```bash
 curl "http://127.0.0.1:8000/check_train"
+```
+
+Exemplo (com símbolo para verificação de artefato):
+
+```bash
+curl "http://127.0.0.1:8000/check_train?symbol=PETR4.SA"
 ```
 
 ## Executar com Docker (macOS / Linux / Windows)
@@ -143,7 +165,6 @@ O container sobe a API via Uvicorn (porta `8000`). O Dockerfile está em [Docker
 Use o Docker Compose (arquivo [compose.yaml](compose.yaml)). Isso funciona igual em macOS/Linux/Windows.
 
 ```bash
-cd "ml-stock-market-predictor"
 docker compose up --build
 ```
 
@@ -158,8 +179,6 @@ DOCKER_PLATFORM=linux/amd64 docker compose up --build
 Use `--platform linux/amd64` para evitar warnings e manter compatibilidade com a imagem base do TensorFlow.
 
 ```bash
-cd "ml-stock-market-predictor"
-
 docker build --platform linux/amd64 -t ml-stock-market-predictor:latest .
 
 docker rm -f ml-stock-market-predictor 2>/dev/null || true
@@ -210,6 +229,30 @@ docker logs -f --tail 50 ml-stock-market-predictor
 
 ```bash
 docker rm -f ml-stock-market-predictor
+```
+
+### Troubleshooting (Docker)
+
+**Erro:** `client version 1.41 is too old. Minimum supported API version is 1.44`
+
+Isso indica que você está usando um **Docker CLI antigo** (muito comum quando existe Rancher Desktop instalado, pois ele coloca `~/.rd/bin/docker` no `PATH`) falando com um daemon mais novo (ex.: Docker Desktop).
+
+Diagnóstico:
+
+```bash
+type -a docker
+docker version
+```
+
+Correção (macOS + Docker Desktop):
+
+- Garanta que o `docker` resolvido seja o do Docker Desktop (normalmente `/usr/local/bin/docker`).
+- Remova `~/.rd/bin` do `PATH` ou mova para o final em `~/.zshrc`/`~/.zprofile`.
+
+Depois confirme que a API subiu (>= 1.44):
+
+```bash
+docker version
 ```
 
 ## Testes

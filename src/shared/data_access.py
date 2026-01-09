@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Iterable, List, Sequence
+from typing import Any, Sequence
 
 from sqlalchemy import Table, create_engine
 from sqlalchemy.engine import Row
