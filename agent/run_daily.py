@@ -40,6 +40,7 @@ START_DATE = os.getenv(
     "TRAIN_START_DATE",
     (datetime.today() - timedelta(days=300)).strftime("%Y-%m-%d"),
 ).strip()
+
 END_DATE = os.getenv("TRAIN_END_DATE", datetime.today().strftime("%Y-%m-%d")).strip()
 
 def print_warning(path: str) -> None:
@@ -72,20 +73,23 @@ def csv_read(caminho_arquivo: str) -> tuple[list[float], str]:
     Os dados serão fatiados conforme necessário.
     Ignora a primeira linha (cabeçalho) e a coluna de datas.
     """
-    if not os.path.exists(caminho_arquivo):
-        print(f"ERRO CRÍTICO: O arquivo '{caminho_arquivo}' não foi encontrado.")
-        sys.exit(1)
-
-    precos = []
-    nome_da_acao = "Desconhecida"
+    verify_ssl = os.getenv("PREDICTION_VERIFY_SSL", "true").lower() != "false"
         
     try:
-        df = yf.download(SYMBOL, start=START_DATE, end=END_DATE, progress=False)
-        df = df.reset_index()
+        print(f"Baixando dados históricos de '{SYMBOL}' de {START_DATE} até {END_DATE} via yfinance...")
+        df = yf.download(SYMBOL, start=START_DATE, end=END_DATE, progress=False, verify=verify_ssl )
+        close_series = df['Close']
+        df = close_series.reset_index()
         if TRAIN_MAX_ROWS and TRAIN_MAX_ROWS > 0:
             df = df.tail(TRAIN_MAX_ROWS).reset_index(drop=True)
         return df
     except Exception as e:
+        if not os.path.exists(caminho_arquivo):
+            print(f"ERRO CRÍTICO: O arquivo '{caminho_arquivo}' não foi encontrado.")
+            sys.exit(1)
+
+        precos = []
+        nome_da_acao = "Desconhecida"
         with open(caminho_arquivo, newline="", encoding="utf-8") as f:
             reader = csv.reader(f)
 
