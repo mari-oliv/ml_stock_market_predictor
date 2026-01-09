@@ -12,7 +12,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     MODEL_ARTIFACT_PATH=/app/src/artifacts/best_lstm_artifact.pkl
 
 # Se pyproject.toml e README.md continuam na raiz do repo:
-COPY LSTM/pyproject.toml LSTM/README.md ./
+COPY pyproject.toml README.md ./
 
 # Código agora está em LSTM/src → copiar para /app/src, que bate com PYTHONPATH
 COPY LSTM/src ./src
