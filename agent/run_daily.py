@@ -3,12 +3,12 @@ import os
 import sqlite3
 import sys
 import time
-
-# Importa a classe do arquivo agent.py
 from agent import AgenteConselheiroDeAcoes
+import warnings
+warnings.filterwarnings("ignore")
 
 CSV_FILE = "./LSTM/data/finance_data.csv"
-DB_FILE = "memory.db"
+DB_FILE = "agent/memory.db"
 
 
 def print_warning(path: str) -> None:
@@ -24,11 +24,11 @@ def print_warning(path: str) -> None:
     -------
     None
     """
-    if os.path.exists(path) and path == "memory.db":
+    if os.path.exists(path) and path == "agent/memory.db":
         print("--- Verifique o arquivo 'memory.db' para ver o histórico completo do agente  ---")
-    if os.path.exists(path) and path == "policy.json":
+    if os.path.exists(path) and path == "agent/policy.json":
         print("--- Verifique o arquivo 'policy.json' para ver a política atual do agente ------")
-    if os.path.exists(path) and path == "metrics.json":
+    if os.path.exists(path) and path == "agent/metrics.json":
         print("--- Verifique o arquivo 'metrics.json' para ver o desempenho do agente ---------")
 
 
@@ -202,7 +202,7 @@ def main() -> None:
     if acao != "MANTER":
         motivo = f"Variação de {delta_previsto * 100:.2f}% supera o risco."
     elif abs(delta_previsto) > threshold_atual:
-        motivo = "Sinal existe, mas volatilidade alta forçou cautela."
+        motivo = "Sinal existe, m  volatilidade alta forçou cautela."
     else:
         motivo = "Variação esperada irrelevante frente ao risco atual."
 
@@ -211,9 +211,9 @@ def main() -> None:
     print("\n--- FIM DA EXECUÇÃO DO AGENTE CONSELHEIRO DE AÇÕES ---\n")
 
     print("-" * 80)
-    print_warning("memory.db")
-    print_warning("policy.json")
-    print_warning("metrics.json")
+    print_warning("agent/memory.db")
+    print_warning("agent/policy.json")
+    print_warning("agent/metrics.json")
     print("-" * 80)
 
 

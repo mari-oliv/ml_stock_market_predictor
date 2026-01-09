@@ -1,6 +1,0 @@
-{
-    "threshold": 0.01,
-    "learning_rate": 0.05,
-    "min_threshold": 0.002,
-    "max_threshold": 0.05
-}

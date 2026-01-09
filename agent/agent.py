@@ -1,14 +1,19 @@
 import json
 import math
 import os
+from socket import timeout
 import sqlite3
 from datetime import datetime
 import requests
+
+
 
 PREDICTION_PATH = "https://ml-stock-market-predictor.onrender.com/predict"
 PREDICTION_HEADERS = {"Content-Type": "application/json"}
 PREDICTION_BODY={"symbol":"PETR4.SA"}
 
+PREDICTION_ARGUMENTS = {"timeout":60,
+                "max_retries":10}
 
 class AgenteConselheiroDeAcoes:
     """
@@ -33,9 +38,9 @@ class AgenteConselheiroDeAcoes:
         inicializa o banco de dados do agente. Caso os arquivos de configuração
         não existam, são criados com valores padrão.
         """
-        self.policy_file = "policy.json"
-        self.metrics_file = "metrics.json"
-        self.db_file = "memory.db"
+        self.policy_file = "agent/policy.json"
+        self.metrics_file = "agent/metrics.json"
+        self.db_file = "agent/memory.db"
         self.policy = self._load_policy()
         self._init_db()
 
@@ -368,13 +373,17 @@ class AgenteConselheiroDeAcoes:
 
         # Lendo predição de saída gerada pela LSTM
         try:
+            # permite desabilitar verificação SSL via variável de ambiente (apenas para dev!)
+            verify_ssl = os.getenv("PREDICTION_VERIFY_SSL", "true").lower() != "false"
+
             prediction_response = requests.post(
                 PREDICTION_PATH,
                 headers=PREDICTION_HEADERS,
                 json=PREDICTION_BODY,
-                timeout=60,
-                max_retries=10,
+                timeout=PREDICTION_ARGUMENTS["timeout"],
+                verify=verify_ssl,
             )
+            prediction_response.raise_for_status()
             predicted_price = prediction_response.json().get("value")
         except Exception as e:
             print(f"ERRO ao ler predição: {e}")
