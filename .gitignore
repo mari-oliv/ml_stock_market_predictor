@@ -1,4 +1,5 @@
 .venv/
+.venv 2/
 
 # Configurações locais de editor
 .vscode/
@@ -49,3 +50,4 @@ __pycache__/
 *.log
 
 notebook_fast.ipynb
+
