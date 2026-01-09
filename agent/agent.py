@@ -3,10 +3,11 @@ import math
 import os
 import sqlite3
 from datetime import datetime
+import requests
 
-PREDICTION_OUTPUT_FILE = (
-    "/home/lucas/my_code/agente_conselheiro_de_acoes/notebooks/prediction_output.json"
-)
+PREDICTION_PATH = "https://ml-stock-market-predictor.onrender.com/predict"
+PREDICTION_HEADERS = {"Content-Type": "application/json"}
+PREDICTION_BODY={"symbol":"PETR4.SA"}
 
 
 class AgenteConselheiroDeAcoes:
@@ -367,10 +368,13 @@ class AgenteConselheiroDeAcoes:
 
         # Lendo predição de saída gerada pela LSTM
         try:
-            if os.path.exists(PREDICTION_OUTPUT_FILE):
-                with open(PREDICTION_OUTPUT_FILE) as f:
-                    data = json.load(f)
-                    predicted_price = data["prediction_r$"]
+            prediction_response = requests.post(
+                PREDICTION_PATH,
+                headers=PREDICTION_HEADERS,
+                json=PREDICTION_BODY,
+                timeout=60
+            )
+            predicted_price = prediction_response.json().get("value")
         except Exception as e:
             print(f"ERRO ao ler predição: {e}")
             raise

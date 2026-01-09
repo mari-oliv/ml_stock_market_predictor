@@ -7,7 +7,7 @@ import time
 # Importa a classe do arquivo agent.py
 from agent import AgenteConselheiroDeAcoes
 
-CSV_FILE = "/home/lucas/my_code/agente_conselheiro_de_acoes/data/finance_data.csv"
+CSV_FILE = "./LSTM/data/finance_data.csv"
 DB_FILE = "memory.db"
 
 
@@ -100,7 +100,7 @@ def main() -> None:
     print(f"Lendo arquivo '{CSV_FILE}'...")
     market_history, nome_da_acao = csv_read(CSV_FILE)
     print(f"Ativo Identificado: '{nome_da_acao}'")
-    time.sleep(5)
+    time.sleep(0)
 
     if len(market_history) < 5:
         print("ERRO: Histórico insuficiente (mínimo 5 dias).")
@@ -116,7 +116,7 @@ def main() -> None:
     print(f">>> Preço de fechamento do mercado HOJE: ${preco_hoje:.2f}")
     print(f"{'=' * 50}")
     print()
-    time.sleep(5)
+    time.sleep(0)
 
     # Instancia o agente
     agente = AgenteConselheiroDeAcoes()
@@ -136,10 +136,10 @@ def main() -> None:
     else:
         print("   - Ainda não houve um trade.")
 
-    time.sleep(5)
+    time.sleep(0)
     # Agente aprende com o que aconteceu de ontem pra hoje
     print("\n[APRENDIZADO DO AGENTE COM BASE NO PASSADO]\n")
-    time.sleep(5)
+    time.sleep(0)
 
     # O agente verifica se tinha alguma recomendação pendente e usa o preço de hoje
     # para saber se acertou ou errou.
@@ -162,7 +162,7 @@ def main() -> None:
         # Se não houve trade ou decisão pendente
         print("   - Nenhuma operação pendente de avaliação.")
 
-    time.sleep(5)
+    time.sleep(0)
     print()
     print("-" * 50)
     print()
@@ -170,7 +170,7 @@ def main() -> None:
     # Passamos o histórico completo. O agente, usando o modelo LSTM disponível,
     # vai decidir quantos dias usar (ex: os últimos 5 para volatilidade, os últimos 60 para LSTM).
     print("[PRÓXIMA ANÁLISE DO AGENTE]\n")
-    time.sleep(5)
+    time.sleep(0)
 
     # Executa a decisão
     acao, preco_previsto, delta_previsto = agente.decide(market_history)
@@ -184,7 +184,7 @@ def main() -> None:
     print(f"   - Variação Esperada (Delta):   {delta_previsto * 100:.2f}%")
 
     print("\nGerando recomendação...")
-    time.sleep(10)
+    time.sleep(0)
 
     # Conclusão final
     indicador = acao
