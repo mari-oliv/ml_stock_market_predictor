@@ -12,10 +12,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     MODEL_ARTIFACT_PATH=/app/src/artifacts/best_lstm_artifact.pkl
 
 COPY pyproject.toml README.md ./
-COPY src ./LSTM/src
-# COPY data ./LSTM/data   # remova esta linha
+COPY src ./src           # <– ajuste o destino p/ bater com PYTHONPATH e MODEL_ARTIFACT_DIR
+# COPY data ./LSTM/data   # já removido
 
-# garante que o diretório existe (opcional, o volume já cria em runtime)
 RUN mkdir -p /app/data
 
 RUN pip install --no-cache-dir --upgrade pip && \
