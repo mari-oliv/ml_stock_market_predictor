@@ -11,9 +11,14 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     MODEL_ARTIFACT_DIR=/app/src/artifacts \
     MODEL_ARTIFACT_PATH=/app/src/artifacts/best_lstm_artifact.pkl
 
-COPY pyproject.toml README.md ./
-COPY src ./src           # <– ajuste o destino p/ bater com PYTHONPATH e MODEL_ARTIFACT_DIR
-# COPY data ./LSTM/data   # já removido
+# Se pyproject.toml e README.md continuam na raiz do repo:
+COPY LSTM/pyproject.toml LSTM/README.md ./
+
+# Código agora está em LSTM/src → copiar para /app/src, que bate com PYTHONPATH
+COPY LSTM/src ./src
+
+# NÃO copiar data pro container (útil só em treino, evita erro se não estiver no Git)
+# COPY LSTM/data ./data
 
 RUN mkdir -p /app/data
 
