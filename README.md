@@ -1,27 +1,55 @@
 # ml-stock-market-predictor
 
-Serviço FastAPI para predição de preços de fechamento da bolsa de valores de uma empresa escolhida.
+Serviço FastAPI para predição de preços de fechamento da bolsa de valores usando modelo LSTM, com fluxo de **treino via notebook** executado em background.
 
 ## Estrutura do projeto
 
-```
+```txt
 ml-stock-market-predictor/
-   data/
-   notebooks/
-   src/
-      api/
-      artifacts/
-      core/
-      inference/
-      shared/
-      training/
-      utils/
+   LSTM/
+      notebooks/
+         notebook.ipynb          # notebook principal de treino
+      src/
+         api/                    # rotas FastAPI (/predict, /train, /check_train)
+         artifacts/              # artefatos de modelo treinado (weights, scaler, etc.)
+         core/                   # lógica de domínio / camadas de negócio
+         inference/              # pipeline de inferência (predict_next_price, etc.)
+         shared/                 # persistência de predições, métricas, utilitários comuns
+         training/               # helpers de treino (data loader, preparação, etc.)
+         utils/                  # utilidades (logging, datas, timer, etc.)
+   data/                         # dados de entrada (CSV, base local)
+   notebooks/                    # (legado / exploratório)
    Dockerfile
+   compose.yaml
+   README.md
 ```
+
+Arquitetura em alto nível:
+
+- **Camada de API (`LSTM/src/api`)**  
+  - Exposição de endpoints REST `/`, `/predict`, `/train`, `/check_train`.
+  - Integração com camada de inferência e orquestração do fluxo de treino.
+
+- **Camada de Inferência (`LSTM/src/inference`)**  
+  - Função `predict_next_price` (pipeline de predição).
+  - Resolução de artefatos (`_resolve_artifact_path`) com base em símbolo / paths.
+
+- **Camada de Treino (`LSTM/src/training` + `LSTM/notebooks/notebook.ipynb`)**  
+  - Treino orquestrado por notebook (grid de hiperparâmetros, early stopping, etc.).
+  - Execução programática do notebook em background via `/train`.
+
+- **Camada Compartilhada (`LSTM/src/shared`)**  
+  - Persistência de predições e snapshots de métricas (ex.: SQLite via `DATABASE_URL`).
+  - Funções auxiliares de armazenamento / leitura.
+
+- **Utilidades (`LSTM/src/utils`)**  
+  - Logging (`logging_config`), datas (`datetime_utils`), medição de tempo (`timer`), etc.
+
+---
 
 ## Rotas da API
 
-As rotas estão definidas em [src/api/routes.py](src/api/routes.py) e carregadas em [src/api/main.py](src/api/main.py).
+As rotas estão definidas em [`LSTM/src/api/routes.py`](LSTM/src/api/routes.py) e carregadas em [`LSTM/src/api/main.py`](LSTM/src/api/main.py).
 
 Base URL (local): http://127.0.0.1:8000
 
@@ -34,6 +62,8 @@ Resposta (exemplo):
 ```json
 {"status":"api is working"}
 ```
+
+---
 
 ### POST /predict
 
@@ -75,45 +105,38 @@ Resposta (exemplo):
 }
 ```
 
+---
+
 ### POST /train
 
-Dispara o treino em background executando o notebook padrão: `notebooks/notebook.ipynb` (no container ele fica em `/app/notebooks/notebook.ipynb`).
+Dispara o **treino em background** executando o notebook padrão:
+
+- Host: `LSTM/notebooks/notebook.ipynb`  
+- Container: `/app/LSTM/notebooks/notebook.ipynb`
+
+A rota **apenas inicia** o fluxo em uma thread separada; o acompanhamento é feito via `GET /check_train`.
 
 Também é possível sobrescrever o notebook via:
 
 - query param `notebook` em `/train` (caminho absoluto ou relativo no container)
-- variável de ambiente `TRAIN_NOTEBOOK` / `TRAIN_NOTEBOOK_PATH`
+- variável de ambiente `TRAIN_NOTEBOOK` ou `TRAIN_NOTEBOOK_PATH`
 
 Variáveis úteis para o treino:
 
 - `TRAIN_KERNEL_NAME` (default: `python3`)
-- `TRAIN_KERNEL_STARTUP_TIMEOUT_S` (default: `900` = 15min) — aumenta o tempo para o kernel iniciar quando o notebook demora.
+- `TRAIN_KERNEL_STARTUP_TIMEOUT_S` (default: `900` = 15min) — tempo máximo para o kernel do notebook iniciar.
 
 Otimização do treino (Docker):
 
 - `TRAIN_GRID_MODE`: `full` (default) | `medium` | `fast`
-   - `fast` reduz drasticamente a varredura (grid) e acelera bastante.
+  - `fast` reduz a varredura (grid) e acelera bastante.
 - `TRAIN_MAX_ROWS`: limita a quantidade de linhas usadas no treino (0 = sem limite).
-- `TRAIN_EARLY_STOPPING_PATIENCE`: reduz/aumenta a paciência do early stopping (default: 10).
+- `TRAIN_EARLY_STOPPING_PATIENCE`: ajusta a paciência do early stopping (default: 10).
 
 Exemplo:
 
 ```bash
 curl -X POST "http://127.0.0.1:8000/train"
-```
-
-Exemplo (Docker run mais rápido):
-
-```bash
-docker run --platform linux/amd64 -d --name ml-stock-market-predictor \
-   -p 8000:8000 \
-   -v "$PWD/data:/app/data" \
-   -e DATABASE_URL="sqlite:///data/predictions.db" \
-   -e TRAIN_KERNEL_STARTUP_TIMEOUT_S=900 \
-   -e TRAIN_GRID_MODE=fast \
-   -e TRAIN_MAX_ROWS=2000 \
-   ml-stock-market-predictor:latest
-```
 ```
 
 Resposta (exemplo):
@@ -122,10 +145,12 @@ Resposta (exemplo):
 {
    "status": "started",
    "started_at": "2026-01-09T03:42:50.759785+00:00",
-   "notebook": "/app/notebooks/notebook.ipynb",
-   "message": "Treino do modelo iniciado, aguarde em torno de 15 à 30 minutos para verificar o status"
+   "notebook": "/app/LSTM/notebooks/notebook.ipynb",
+   "message": "Treino do modelo iniciado em background; consulte /check_train para acompanhar o status."
 }
 ```
+
+---
 
 ### GET /check_train
 
@@ -134,13 +159,16 @@ Retorna status do treino + métricas de desempenho.
 Campos principais:
 
 - `train_status`: `idle` | `running` | `succeeded` | `failed`
-- `phase`: fase atual do fluxo de treino (`idle`, `starting`, `find_notebook`, `prepare_paths`, `execute`, `finalizing`, `done`)
-- `prereqs`: informações sobre kernel e dependências (chaves como `kernel_name`, `kernel_available`, `missing_modules`, `ok`)
+- `phase`: fase atual do fluxo de treino  
+  (`idle`, `starting`, `find_notebook`, `prepare_paths`, `execute`, `finalizing`, `done`)
+- `prereqs`: informações sobre kernel e dependências  
+  (`kernel_name`, `kernel_available`, `missing_modules`, `ok`, etc.)
 - `execute_engine`: engine usada para execução do notebook (ex.: `nbclient`)
 - `execute_started_at` / `nbclient_started_at`: timestamps de início da execução
 - `elapsed_s`: tempo decorrido (segundos) enquanto está `running`
 - `duration_s`: tempo total (segundos) quando finaliza
-- `metrics`: tempos por etapa (`find_notebook_s`, `prepare_paths_s`, `execute_s`), `engine`, `notebook_in`, `notebook_out`
+- `metrics`: tempos por etapa (`find_notebook_s`, `prepare_paths_s`, `execute_s`),  
+  `engine`, `notebook_in`, `notebook_out`
 - `artifact_found`: se um artefato (modelo treinado) foi encontrado para o símbolo
 - `artifact_path`: caminho absoluto do artefato encontrado
 
@@ -160,27 +188,27 @@ Exemplo (com símbolo para verificação de artefato):
 curl "http://127.0.0.1:8000/check_train?symbol=PETR4.SA"
 ```
 
-## Executar com Docker (macOS / Linux / Windows)
+---
 
-O container sobe a API via Uvicorn (porta `8000`). O Dockerfile está em [Dockerfile](Dockerfile).
+## Execução com Docker (macOS / Linux / Windows)
 
-### Opção recomendada (um comando, qualquer SO)
+O container sobe a API via Uvicorn (porta `8000`). O Dockerfile está em [`Dockerfile`](Dockerfile).
 
-Use o Docker Compose (arquivo [compose.yaml](compose.yaml)). Isso funciona igual em macOS/Linux/Windows.
+### Opção recomendada (qualquer SO)
+
+Use o Docker Compose (arquivo [`compose.yaml`](compose.yaml)):
 
 ```bash
 docker compose up --build
 ```
 
-Para rodar em outra plataforma (ex.: Apple Silicon usando amd64 via emulação), você pode setar:
+Para rodar em outra plataforma (ex.: Apple Silicon usando amd64 via emulação):
 
 ```bash
 DOCKER_PLATFORM=linux/amd64 docker compose up --build
 ```
 
 ### macOS (Apple Silicon: M1/M2/M3)
-
-Use `--platform linux/amd64` para evitar warnings e manter compatibilidade com a imagem base do TensorFlow.
 
 ```bash
 docker build --platform linux/amd64 -t ml-stock-market-predictor:latest .
@@ -235,29 +263,7 @@ docker logs -f --tail 50 ml-stock-market-predictor
 docker rm -f ml-stock-market-predictor
 ```
 
-### Troubleshooting (Docker)
-
-**Erro:** `client version 1.41 is too old. Minimum supported API version is 1.44`
-
-Isso indica que você está usando um **Docker CLI antigo** (muito comum quando existe Rancher Desktop instalado, pois ele coloca `~/.rd/bin/docker` no `PATH`) falando com um daemon mais novo (ex.: Docker Desktop).
-
-Diagnóstico:
-
-```bash
-type -a docker
-docker version
-```
-
-Correção (macOS + Docker Desktop):
-
-- Garanta que o `docker` resolvido seja o do Docker Desktop (normalmente `/usr/local/bin/docker`).
-- Remova `~/.rd/bin` do `PATH` ou mova para o final em `~/.zshrc`/`~/.zprofile`.
-
-Depois confirme que a API subiu (>= 1.44):
-
-```bash
-docker version
-```
+---
 
 ## Testes
 

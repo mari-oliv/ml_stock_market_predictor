@@ -1,4 +1,3 @@
-import glob
 import importlib
 import logging
 import os
@@ -218,47 +217,17 @@ def _collect_train_prereqs() -> dict[str, Any]:
 
 
 def _find_notebook(root: str) -> str:
-    """Localiza o notebook de treino a partir da raiz do projeto.
+    """Localiza o notebook de treino em um caminho fixo."""
 
-    Contexto:
-        Busca o caminho do ``notebook.ipynb`` usando variáveis de
-        ambiente de override e, em seguida, padrões conhecidos de
-        diretórios, com fallback para busca recursiva.
+    # Caminho fixo absoluto para o notebook
+    notebook_path = os.path.abspath(os.path.join(root, "notebooks", "notebook.ipynb"))
+    logger.info(f"train:find_notebook caminho fixo={notebook_path}")
 
-    Args:
-        root: Caminho absoluto considerado como raiz do projeto.
-
-    Returns:
-        Caminho absoluto para o notebook de treino encontrado.
-
-    Raises:
-        FileNotFoundError: Se nenhum notebook de treino for localizado.
-    """
-    env_nb = os.getenv("TRAIN_NOTEBOOK") or os.getenv("TRAIN_NOTEBOOK_PATH")
-    candidates = []
-    if env_nb:
-        candidates.append(env_nb)
-
-    lstm_default = os.path.join(root, "notebooks", "notebook.ipynb")
-    logger.info(f"train:find_notebook root={root} candidate_lstm_default={lstm_default}")
-    candidates.append(lstm_default)
-    candidates.append(
-        os.path.abspath(
-            os.path.join(root, "..", "tc4", "ml-unified-service", "notebooks", "notebook.ipynb")
-        )
-    )
-
-    for p in candidates:
-        if p and os.path.exists(p):
-            return os.path.abspath(p)
-
-    for base in [root, os.path.abspath(os.path.join(root, ".."))]:
-        matches = glob.glob(os.path.join(base, "**", "notebooks", "notebook.ipynb"), recursive=True)
-        if matches:
-            return os.path.abspath(matches[0])
+    if os.path.exists(notebook_path):
+        return notebook_path
 
     raise FileNotFoundError(
-        "Notebook não encontrado. Defina TRAIN_NOTEBOOK com o caminho completo do notebook.ipynb."
+        f"Notebook não encontrado no caminho fixo: {notebook_path}"
     )
 
 
