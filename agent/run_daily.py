@@ -74,7 +74,8 @@ def csv_read(caminho_arquivo: str) -> tuple[list[float], str]:
     Ignora a primeira linha (cabeçalho) e a coluna de datas.
     """
     verify_ssl = os.getenv("PREDICTION_VERIFY_SSL", "true").lower() != "false"
-        
+    precos = []
+    nome_da_acao = "Desconhecida"
     try:
         print(f"Baixando dados históricos de '{SYMBOL}' de {START_DATE} até {END_DATE} via yfinance...")
         df = yf.download(SYMBOL, start=START_DATE, end=END_DATE, progress=False, verify=verify_ssl )
@@ -82,15 +83,15 @@ def csv_read(caminho_arquivo: str) -> tuple[list[float], str]:
         df = close_series.reset_index()
         if TRAIN_MAX_ROWS and TRAIN_MAX_ROWS > 0:
             df = df.tail(TRAIN_MAX_ROWS).reset_index(drop=True)
+            df.to_csv("./LSTM/data/finance_data.csv", index=False) 
         return df
     except Exception as e:
         if not os.path.exists(caminho_arquivo):
             print(f"ERRO CRÍTICO: O arquivo '{caminho_arquivo}' não foi encontrado.")
             sys.exit(1)
 
-        precos = []
-        nome_da_acao = "Desconhecida"
         with open(caminho_arquivo, newline="", encoding="utf-8") as f:
+            print(f"Lendo dados históricos de '{SYMBOL}' do arquivo CSV '{caminho_arquivo}'...")
             reader = csv.reader(f)
 
             try:
@@ -110,7 +111,7 @@ def csv_read(caminho_arquivo: str) -> tuple[list[float], str]:
                     except ValueError:
                         continue  # Pula linhas com erro de formatação
 
-    return precos, nome_da_acao
+        return precos, nome_da_acao
 
 
 def main() -> None:
