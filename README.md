@@ -6,44 +6,29 @@ Serviço FastAPI para predição de preços de fechamento da bolsa de valores us
 
 ```txt
 ml-stock-market-predictor/
-   LSTM/
-      notebooks/
-         notebook.ipynb          # notebook principal de treino
-      src/
-         api/                    # rotas FastAPI (/predict, /train, /check_train)
-         artifacts/              # artefatos de modelo treinado (weights, scaler, etc.)
-         core/                   # lógica de domínio / camadas de negócio
-         inference/              # pipeline de inferência (predict_next_price, etc.)
-         shared/                 # persistência de predições, métricas, utilitários comuns
-         training/               # helpers de treino (data loader, preparação, etc.)
-         utils/                  # utilidades (logging, datas, timer, etc.)
-   data/                         # dados de entrada (CSV, base local)
-   notebooks/                    # (legado / exploratório)
-   Dockerfile
-   compose.yaml
-   README.md
+│
+├── LSTM/
+│   ├── notebooks/
+│   │   └── notebook.ipynb          # notebook principal de treino
+│   └── src/
+│       ├── api/                    # rotas FastAPI (/predict, /train, /check_train)
+│       ├── artifacts/              # artefatos de modelo treinado (weights, scaler, etc.)
+│       ├── core/                   # lógica de domínio / camadas de negócio
+│       ├── inference/              # pipeline de inferência (predict_next_price, etc.)
+│       ├── shared/                 # persistência de predições, métricas, utilitários comuns
+│       ├── training/               # helpers de treino (data loader, preparação, etc.)
+│       ├── utils/                  # utilidades (logging, datas, timer, etc.)
+│       └── agent/                  # lógica do agente (ex: automação, execução periódica)
+│
+├── data/                           # dados de entrada (CSV, base local)
+├── Dockerfile
+├── compose.yaml
+└── README.md
 ```
 
-Arquitetura em alto nível:
-
-- **Camada de API (`LSTM/src/api`)**  
-  - Exposição de endpoints REST `/`, `/predict`, `/train`, `/check_train`.
-  - Integração com camada de inferência e orquestração do fluxo de treino.
-
-- **Camada de Inferência (`LSTM/src/inference`)**  
-  - Função `predict_next_price` (pipeline de predição).
-  - Resolução de artefatos (`_resolve_artifact_path`) com base em símbolo / paths.
-
-- **Camada de Treino (`LSTM/src/training` + `LSTM/notebooks/notebook.ipynb`)**  
-  - Treino orquestrado por notebook (grid de hiperparâmetros, early stopping, etc.).
-  - Execução programática do notebook em background via `/train`.
-
-- **Camada Compartilhada (`LSTM/src/shared`)**  
-  - Persistência de predições e snapshots de métricas (ex.: SQLite via `DATABASE_URL`).
-  - Funções auxiliares de armazenamento / leitura.
-
-- **Utilidades (`LSTM/src/utils`)**  
-  - Logging (`logging_config`), datas (`datetime_utils`), medição de tempo (`timer`), etc.
+**Notas:**
+- O notebook de treino fica em `LSTM/notebooks/notebook.ipynb`.
+- O código Python está todo em `LSTM/src/`, incluindo a pasta `agent/` para a lógica do agente.
 
 ---
 
