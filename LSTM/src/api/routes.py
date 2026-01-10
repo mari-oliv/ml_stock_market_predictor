@@ -239,7 +239,9 @@ def _find_notebook(root: str) -> str:
     if env_nb:
         candidates.append(env_nb)
 
-    candidates.append(os.path.join(root, "notebooks", "notebook.ipynb"))
+    lstm_default = os.path.join(root, "notebooks", "notebook.ipynb")
+    logger.info(f"train:find_notebook root={root} candidate_lstm_default={lstm_default}")
+    candidates.append(lstm_default)
     candidates.append(
         os.path.abspath(
             os.path.join(root, "..", "tc4", "ml-unified-service", "notebooks", "notebook.ipynb")
