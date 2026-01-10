@@ -17,6 +17,9 @@ COPY pyproject.toml README.md ./
 # Código agora está em LSTM/src → copiar para /app/src, que bate com PYTHONPATH
 COPY LSTM/src ./src
 
+# Copia o notebook de treino para o caminho correto no container
+COPY LSTM/notebooks ./LSTM/notebooks
+
 # NÃO copiar data pro container (útil só em treino, evita erro se não estiver no Git)
 # COPY LSTM/data ./data
 
