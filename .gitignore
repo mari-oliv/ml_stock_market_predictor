@@ -49,3 +49,7 @@ __pycache__/
 
 notebook_fast.ipynb
 
+metrics.json
+policy.json
+memory.db
+predictions.db

@@ -91,7 +91,7 @@ def csv_read(caminho_arquivo: str) -> tuple[list[float], str]:
             sys.exit(1)
 
         with open(caminho_arquivo, newline="", encoding="utf-8") as f:
-            print(f"Lendo dados históricos de '{SYMBOL}' do arquivo CSV '{caminho_arquivo}'...")
+            print(f"yFinance não respondeu. Lendo dados {SYMBOL} de backup do arquivo CSV '{caminho_arquivo}'...")
             reader = csv.reader(f)
 
             try:
