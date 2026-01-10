@@ -415,56 +415,59 @@ def _run_notebook():
 
 @router.post("/train")
 def start_train(notebook: Optional[str] = None):
-    """Inicia o fluxo de treinamento de modelo em background.
+    """Dispara o processo de treinamento em background.
 
     Contexto:
-        Resolve o notebook de treino a ser utilizado (podendo ser
-        sobrescrito via parâmetro), valida sua existência e inicia
-        uma thread que executa o notebook assincronamente.
+        Endpoint responsável apenas por iniciar o fluxo de treinamento
+        de modelo em uma thread separada. Opcionalmente, permite
+        sobrescrever o notebook padrão via parâmetro, realizando uma
+        validação rápida de existência do arquivo antes de iniciar.
+        O acompanhamento detalhado do progresso deve ser feito via
+        endpoint ``GET /check_train``.
 
     Args:
-        notebook: Caminho opcional para um notebook específico a ser
-            usado no treino. Quando informado, sobrescreve o padrão
-            via variável de ambiente ``TRAIN_NOTEBOOK``.
+        notebook: Caminho opcional para um notebook específico de treino.
+            Quando informado e encontrado, sobrescreve o caminho padrão
+            por meio da variável de ambiente ``TRAIN_NOTEBOOK``.
 
     Returns:
-        Dicionário com o status de inicialização, timestamp de início
-        e caminho do notebook de treino efetivamente utilizado.
+        Dicionário contendo:
+            - ``status``: "started" ou "running" se já houver treino em andamento;
+            - ``started_at``: timestamp do momento em que o treino foi disparado;
+            - ``notebook``: caminho do notebook de treino resolvido;
+            - ``message``: instrução breve sobre aguardar e consultar o status.
 
     Raises:
-        HTTPException: Se o notebook indicado não existir ou não puder
-            ser resolvido a partir da raiz do projeto.
+        HTTPException:
+            - 400 se o notebook informado não existir;
+            - 400 se não for possível resolver um notebook de treino padrão.
     """
-    if notebook:
-        nb_path = os.path.abspath(os.path.expanduser(notebook))
-        if not os.path.exists(nb_path):
-            logger.warning(f"train:override_notebook not_found path={nb_path}")
-            raise HTTPException(status_code=400, detail=f"Notebook não encontrado em: {nb_path}")
-        os.environ["TRAIN_NOTEBOOK"] = nb_path
-        logger.info(f"train:override_notebook path={nb_path}")
-
-    try:
-        root = _project_root()
-        resolved_nb = _find_notebook(root)
-        with _TRAIN_LOCK:
-            TRAIN_STATE["notebook"] = resolved_nb
-    except Exception as e:
-        logger.warning(f"train:notebook_not_found error={e}")
-        raise HTTPException(status_code=400, detail=str(e))
 
     if TRAIN_STATE["status"] == "running":
         logger.info("train:already_running")
         return {"status": "running", "started_at": TRAIN_STATE["started_at"]}
 
+    if notebook:
+        nb_path = os.path.abspath(os.path.expanduser(notebook))
+        if not os.path.exists(nb_path):
+            logger.warning(f"train:override_notebook not_found path={nb_path}")
+        else:
+            os.environ["TRAIN_NOTEBOOK"] = nb_path
+            with _TRAIN_LOCK:
+                TRAIN_STATE["notebook"] = nb_path
+            logger.info(f"train:override_notebook path={nb_path}")
+
+
     t = threading.Thread(target=_run_notebook, daemon=True)
     t.start()
     now = brasilia_iso()
     logger.info("train:started")
+
     return {
         "status": "started",
         "started_at": now,
-        "notebook": resolved_nb,
-        "message": "Treino do modelo iniciado, aguarde em torno de 15 à 30 minutos para verificar o status",
+        "notebook": TRAIN_STATE.get("notebook"),
+        "message": "Treino do modelo iniciado em background; consulte /check_train para acompanhar o status.",
     }
 
 
