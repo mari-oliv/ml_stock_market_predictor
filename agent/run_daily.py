@@ -3,22 +3,23 @@ import os
 import sqlite3
 import sys
 import time
-from agent import AgenteConselheiroDeAcoes
-import yfinance as yf
 import warnings
 from datetime import datetime, timedelta
+
+import yfinance as yf
+
+from agent import AgenteConselheiroDeAcoes
+
 warnings.filterwarnings("ignore")
 
 
 PREDICTION_PATH = "https://ml-stock-market-predictor.onrender.com/predict"
 PREDICTION_HEADERS = {"Content-Type": "application/json"}
-PREDICTION_BODY={"symbol":"PETR4.SA"}
-PREDICTION_ARGUMENTS = {"timeout":60,
-                "max_retries":10}
-
+PREDICTION_BODY = {"symbol": "PETR4.SA"}
+PREDICTION_ARGUMENTS = {"timeout": 60, "max_retries": 10}
 CSV_FILE = "./LSTM/data/finance_data.csv"
-
 DB_FILE = "agent/memory.db"
+
 
 def _env_int(name: str, default: int) -> int:
     """
@@ -31,7 +32,8 @@ def _env_int(name: str, default: int) -> int:
         return int(float(str(v).strip()))
     except Exception:
         return default
-    
+
+
 TRAIN_MAX_ROWS = _env_int("TRAIN_MAX_ROWS", 0)
 
 SYMBOL = os.getenv("TRAIN_SYMBOL", "PETR4.SA").strip()
@@ -42,6 +44,7 @@ START_DATE = os.getenv(
 ).strip()
 
 END_DATE = os.getenv("TRAIN_END_DATE", datetime.today().strftime("%Y-%m-%d")).strip()
+
 
 def print_warning(path: str) -> None:
     """
@@ -66,6 +69,9 @@ def print_warning(path: str) -> None:
 
 def csv_read(caminho_arquivo: str) -> tuple[list[float], str]:
     """
+    Tenta pegar dados do histórico de preços a partir de um arquivo CSV no yfinance.
+    Caso dê erro, tenta pegar do arquivo CSV de backup. Caso também falhe, levante erro.
+
     Lê o arquivo CSV e retorna uma tupla contendo:
     - uma lista com todo o histórico de preços (floats).
     - o nome da ação (string) extraído do cabeçalho.
@@ -73,45 +79,48 @@ def csv_read(caminho_arquivo: str) -> tuple[list[float], str]:
     Os dados serão fatiados conforme necessário.
     Ignora a primeira linha (cabeçalho) e a coluna de datas.
     """
-    verify_ssl = os.getenv("PREDICTION_VERIFY_SSL", "true").lower() != "false"
-    precos = []
-    nome_da_acao = "Desconhecida"
     try:
-        print(f"Baixando dados históricos de '{SYMBOL}' de {START_DATE} até {END_DATE} via yfinance...")
-        df = yf.download(SYMBOL, start=START_DATE, end=END_DATE, progress=False, verify=verify_ssl )
-        close_series = df['Close']
+        print(
+            f"Tentando baixar dados históricos de '{SYMBOL}' de {START_DATE} até {END_DATE} via yfinance...\n"
+        )
+        df = yf.download(SYMBOL, start=START_DATE, end=END_DATE, progress=False)
+        close_series = df["Close"]
         df = close_series.reset_index()
         if TRAIN_MAX_ROWS and TRAIN_MAX_ROWS > 0:
             df = df.tail(TRAIN_MAX_ROWS).reset_index(drop=True)
-            df.to_csv("./LSTM/data/finance_data.csv", index=False) 
-        return df
-    except Exception as e:
+        df.to_csv("./LSTM/data/finance_data.csv", index=False)
+        print("Arquivo csv criado com sucesso diretamente do yfinance.")
+
+    except Exception:
+        print("Falha ao pegar dados via yfinance, tentando pegar do arquivo CSV de backup...")
         if not os.path.exists(caminho_arquivo):
-            print(f"ERRO CRÍTICO: O arquivo '{caminho_arquivo}' não foi encontrado.")
+            print(f"ERRO CRÍTICO: O arquivo '{caminho_arquivo}' de backupnão foi encontrado.")
+            sys.exit(1)
+        print("Arquivo CSV de backup encontrado com sucesso!")
+
+    precos = []
+    nome_da_acao = "Desconhecida"
+    with open(caminho_arquivo, newline="", encoding="utf-8") as f:
+        reader = csv.reader(f)
+
+        try:
+            header = next(reader)
+            if len(header) > 1:
+                nome_da_acao = header[1]
+        except StopIteration:
+            print("ERRO: Arquivo CSV vazio.")
             sys.exit(1)
 
-        with open(caminho_arquivo, newline="", encoding="utf-8") as f:
-            print(f"yFinance não respondeu. Lendo dados {SYMBOL} de backup do arquivo CSV '{caminho_arquivo}'...")
-            reader = csv.reader(f)
+        for row in reader:
+            if row:  # Evita linhas vazias
+                try:
+                    # Pega a coluna 1 (Preço) e converte para float
+                    valor = float(row[1])
+                    precos.append(valor)
+                except ValueError:
+                    continue  # Pula linhas com erro de formatação
 
-            try:
-                header = next(reader)
-                if len(header) > 1:
-                    nome_da_acao = header[1]
-            except StopIteration:
-                print("ERRO: Arquivo CSV vazio.")
-                sys.exit(1)
-
-            for row in reader:
-                if row:  # Evita linhas vazias
-                    try:
-                        # Pega a coluna 1 (Preço) e converte para float
-                        valor = float(row[1])
-                        precos.append(valor)
-                    except ValueError:
-                        continue  # Pula linhas com erro de formatação
-
-        return precos, nome_da_acao
+    return precos, nome_da_acao
 
 
 def main() -> None:
@@ -136,10 +145,9 @@ def main() -> None:
     """
     print("\n--- EXECUTANDO AGENTE CONSELHEIRO DE AÇÕES ---\n")
 
-    print(f"Lendo arquivo '{CSV_FILE}'...")
     market_history, nome_da_acao = csv_read(CSV_FILE)
     print(f"Ativo Identificado: '{nome_da_acao}'")
-    time.sleep(0)
+    time.sleep(5)
 
     if len(market_history) < 5:
         print("ERRO: Histórico insuficiente (mínimo 5 dias).")
@@ -155,7 +163,7 @@ def main() -> None:
     print(f">>> Preço de fechamento do mercado HOJE: ${preco_hoje:.2f}")
     print(f"{'=' * 50}")
     print()
-    time.sleep(0)
+    time.sleep(5)
 
     # Instancia o agente
     agente = AgenteConselheiroDeAcoes()
@@ -175,10 +183,10 @@ def main() -> None:
     else:
         print("   - Ainda não houve um trade.")
 
-    time.sleep(0)
+    time.sleep(5)
     # Agente aprende com o que aconteceu de ontem pra hoje
     print("\n[APRENDIZADO DO AGENTE COM BASE NO PASSADO]\n")
-    time.sleep(0)
+    time.sleep(5)
 
     # O agente verifica se tinha alguma recomendação pendente e usa o preço de hoje
     # para saber se acertou ou errou.
@@ -201,7 +209,7 @@ def main() -> None:
         # Se não houve trade ou decisão pendente
         print("   - Nenhuma operação pendente de avaliação.")
 
-    time.sleep(0)
+    time.sleep(5)
     print()
     print("-" * 50)
     print()
@@ -209,7 +217,7 @@ def main() -> None:
     # Passamos o histórico completo. O agente, usando o modelo LSTM disponível,
     # vai decidir quantos dias usar (ex: os últimos 5 para volatilidade, os últimos 60 para LSTM).
     print("[PRÓXIMA ANÁLISE DO AGENTE]\n")
-    time.sleep(0)
+    time.sleep(5)
 
     # Executa a decisão
     acao, preco_previsto, delta_previsto = agente.decide(market_history)
@@ -223,7 +231,7 @@ def main() -> None:
     print(f"   - Variação Esperada (Delta):   {delta_previsto * 100:.2f}%")
 
     print("\nGerando recomendação...")
-    time.sleep(0)
+    time.sleep(5)
 
     # Conclusão final
     indicador = acao

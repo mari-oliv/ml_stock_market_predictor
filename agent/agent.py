@@ -1,20 +1,20 @@
 import json
 import math
 import os
-from socket import timeout
 import sqlite3
-from datetime import datetime
-import requests
 import warnings
+from datetime import datetime
+
+import requests
 
 warnings.filterwarnings("ignore")
 
 PREDICTION_PATH = "https://ml-stock-market-predictor.onrender.com/predict"
 PREDICTION_HEADERS = {"Content-Type": "application/json"}
-PREDICTION_BODY={"symbol":"PETR4.SA"}
+PREDICTION_BODY = {"symbol": "PETR4.SA"}
 
-PREDICTION_ARGUMENTS = {"timeout":60,
-                "max_retries":10}
+PREDICTION_ARGUMENTS = {"timeout": 60, "max_retries": 10}
+
 
 class AgenteConselheiroDeAcoes:
     """
@@ -353,7 +353,8 @@ class AgenteConselheiroDeAcoes:
 
     def decide(self, market_history: list) -> tuple[str, float, float]:
         """
-        Decide a recomendação (comprar, vender ou manter) com base nos dados do mercado.
+        Decide a recomendação (comprar, vender ou manter) com base nos dados do
+        mercado e a predição gerada pela LSTM para o dia seguinte.
 
         Parameters
         ----------
@@ -374,15 +375,11 @@ class AgenteConselheiroDeAcoes:
 
         # Lendo predição de saída gerada pela LSTM
         try:
-            # permite desabilitar verificação SSL via variável de ambiente (apenas para dev!)
-            verify_ssl = os.getenv("PREDICTION_VERIFY_SSL", "true").lower() != "false"
-
             prediction_response = requests.post(
                 PREDICTION_PATH,
                 headers=PREDICTION_HEADERS,
                 json=PREDICTION_BODY,
                 timeout=PREDICTION_ARGUMENTS["timeout"],
-                verify=verify_ssl,
             )
             prediction_response.raise_for_status()
             predicted_price = prediction_response.json().get("value")
