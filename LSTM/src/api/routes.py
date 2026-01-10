@@ -219,8 +219,7 @@ def _collect_train_prereqs() -> dict[str, Any]:
 def _find_notebook(root: str) -> str:
     """Localiza o notebook de treino em um caminho fixo."""
 
-    # Caminho fixo absoluto para o notebook
-    notebook_path = os.path.abspath(os.path.join(root, "notebooks", "notebook.ipynb"))
+    notebook_path = os.path.abspath(os.path.join(root, "LSTM", "notebooks", "notebook.ipynb"))
     logger.info(f"train:find_notebook caminho fixo={notebook_path}")
 
     if os.path.exists(notebook_path):
